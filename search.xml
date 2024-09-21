@@ -107,7 +107,7 @@ $$ -->
 </ul>
 </li>
 </ol>
-<h1 id="3-结果和总结"><a href="#3-结果和总结" class="headerlink" title="3 结果和总结"></a>3 结果和总结</h1><h2 id="结果评估"><a href="#结果评估" class="headerlink" title="结果评估"></a>结果评估</h2><p>pros：训练速度快，效果好</p>
+<h1 id="结果和总结"><a href="#结果和总结" class="headerlink" title="结果和总结"></a>结果和总结</h1><h2 id="结果评估"><a href="#结果评估" class="headerlink" title="结果评估"></a>结果评估</h2><p>pros：训练速度快，效果好</p>
 <p>cons：内存占用大（高斯太多（eg. 200k~500k），每个高斯的参数也多）</p>
 <p>尤其对比Nerf</p>
 <p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E7%BB%93%E6%9E%9C%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 10.22.37.png"></p>
