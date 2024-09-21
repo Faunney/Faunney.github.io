@@ -10,27 +10,10 @@
       </categories>
   </entry>
   <entry>
-    <title>Hello World</title>
-    <url>/2024/03/04/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
-  </entry>
-  <entry>
     <title>论文精读笔记系列（1）</title>
     <url>/2024/09/21/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/</url>
-    <content><![CDATA[<h1 id="3D-Gaussian-Splatting-for-Real-Time-Radiance-Field-Rendering-论文精读笔记"><a href="#3D-Gaussian-Splatting-for-Real-Time-Radiance-Field-Rendering-论文精读笔记" class="headerlink" title="3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记"></a>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</h1><p>项目网页链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/</a></p>
+    <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br><br></p>
+<p>项目网页链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/</a></p>
 <p>论文链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf</a></p>
 <p>源代码链接：<a href="https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file">https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file</a></p>
 <h1 id="1-前言"><a href="#1-前言" class="headerlink" title="1 前言"></a>1 前言</h1><p><strong>contributions：</strong></p>
@@ -43,7 +26,7 @@
 <p>3 优化渲染速度的方法</p>
 <h1 id="2-3DGS"><a href="#2-3DGS" class="headerlink" title="2 3DGS"></a>2 3DGS</h1><h2 id="2-1-overview"><a href="#2-1-overview" class="headerlink" title="2.1 overview"></a>2.1 overview</h2><p>输入：一组静态照片+<strong>SfM估计的相机姿态与点云</strong></p>
 <p>选用高斯原因：各向异性体积可用于紧凑地表示精细结构</p>
-<p>用点云初始化高斯</p>
+<p>用点云初始化高斯:</p>
 <p><strong>高斯性质：mean（位置），covariance（形状），opacity（不透明度）</strong></p>
 <p>各向异性的颜色可用<strong>球谐函数（SH）</strong>表示</p>
 <p>通过<strong>3dgs优化参数+高斯密度的自适应控制操作</strong>来创建可以表示场景的辐射场</p>
@@ -52,11 +35,15 @@
 <p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%B5%81%E7%A8%8B%E5%9B%BE.png" alt="截屏2024-09-19 23.39.18.png"></p>
 <h2 id="2-2-可微的3dgs（构建高斯）"><a href="#2-2-可微的3dgs（构建高斯）" class="headerlink" title="2.2 可微的3dgs（构建高斯）"></a>2.2 可微的3dgs（构建高斯）</h2><p>为什么选择Gaussians：可微+方便投影成2D（可以快速α混合）</p>
 <p>3D Gaussian公式：</p>
-<p>$$<br>G(x) &#x3D; e^{-\frac{1}{2}(x)^T\Sigma^{-1}(x)}<br>$$</p>
+<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/3dgs%E5%85%AC%E5%BC%8F.png" alt="公式1.png"></p>
 <p>PS：x为坐标矩阵；Σ为协方差矩阵，隐式地包含了mean（μ）信息</p>
 <p>混合时G(x)乘以α（不透明度）</p>
 <p>投影公式：</p>
-<p>$$<br>\sum ‘ &#x3D; J W ; \Sigma ; W ^ { T } ; J ^ { T }<br>$$</p>
+<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%8A%95%E5%BD%B1%E5%85%AC%E5%BC%8F.png" alt="公式1.png"></p>
+<!-- $$
+\sum ' = J W \; \Sigma \; W ^ { T } \; J ^ { T }
+$$ -->
+
 <p>因<strong>协方差矩阵中的数据有范围限制</strong>，梯度下降算法易更新出无效协方差矩阵。</p>
 <p>解决方法：</p>
 <p>高斯可以<strong>类椭球</strong>，用梯度下降<strong>改“Σ”→用梯度下降改“椭球3r+scale+rotate”</strong></p>
@@ -70,8 +57,10 @@
 <p>  初始化Σ（正实数*identity matrix）使得高斯为<strong>各向同性高斯</strong>，即分布密度值仅与到均值距离有关、与方向无关</p>
 <p>  以距离最近的三个点（SfM生成的点云）为标准生成初始化高斯</p>
 <p>  用<strong>标准指数衰减调度</strong>优化μ</p>
-<p>  生成图片对比目标图片的<strong>loss</strong>由<strong>D-SSIM</strong>（衡量两幅图片相似性的算法）得到：</p>
-<p>  $$<br>  \mathcal{L} &#x3D; (1 - \lambda)\mathcal{L}<em>1 + \lambda\mathcal{L}</em>{D-SSIM}<br>  $$</p>
+<p>  生成图片对比目标图片的<strong>loss</strong>由<strong>D-SSIM</strong>（衡量两幅图片相似性的算法）得到：<br>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%88%AA%E5%B1%8F2024-09-21%2017.30.39.png" alt="公式2.png"></p>
+  <!-- $$
+  \mathcal{L} = (1 - \lambda)\mathcal{L}_1 + \lambda\mathcal{L}_{D-SSIM}
+  $$ -->
 <p>  PS：实验中λ取0.2</p>
 </li>
 <li><h3 id="自适应高斯控制"><a href="#自适应高斯控制" class="headerlink" title="自适应高斯控制"></a>自适应高斯控制</h3><p>  用稀疏点云初始化出的高斯很稀疏，需控制单位体积中的高斯数量</p>
