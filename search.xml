@@ -5,6 +5,9 @@
     <url>/2024/05/17/first-publish/</url>
     <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>欢迎访问</p>
 ]]></content>
+      <categories>
+        <category>chitchat</category>
+      </categories>
   </entry>
   <entry>
     <title>Hello World</title>
@@ -30,14 +33,15 @@
     <content><![CDATA[<h1 id="3D-Gaussian-Splatting-for-Real-Time-Radiance-Field-Rendering-论文精读笔记"><a href="#3D-Gaussian-Splatting-for-Real-Time-Radiance-Field-Rendering-论文精读笔记" class="headerlink" title="3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记"></a>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</h1><p>项目网页链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/</a></p>
 <p>论文链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf</a></p>
 <p>源代码链接：<a href="https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file">https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file</a></p>
-<h2 id="1-前言"><a href="#1-前言" class="headerlink" title="1 前言"></a>1 前言</h2><h3 id="contributions："><a href="#contributions：" class="headerlink" title="contributions："></a>contributions：</h3><ol>
+<h1 id="1-前言"><a href="#1-前言" class="headerlink" title="1 前言"></a>1 前言</h1><p><strong>contributions：</strong></p>
+<ol>
 <li>提出<strong>各向异性的3D高斯</strong>作为辐射场的高质量、非结构化表示</li>
 <li>提出3D高斯属性的优化方法，以及<strong>自适应密度控制</strong>（为高质量表达场景）</li>
 <li>提出的算法<strong>适应快速GPU计算</strong>（cuda kernel）的方法，支持各向异性高斯的泼溅和快速的反向传播算法执行，快速生成新视角（*重要）</li>
 </ol>
 <p>1+2 优化场景的算法</p>
 <p>3 优化渲染速度的方法</p>
-<h2 id="2-3DGS"><a href="#2-3DGS" class="headerlink" title="2 3DGS"></a>2 3DGS</h2><h3 id="2-1-overview"><a href="#2-1-overview" class="headerlink" title="2.1 overview"></a>2.1 overview</h3><p>输入：一组静态照片+<strong>SfM估计的相机姿态与点云</strong></p>
+<h1 id="2-3DGS"><a href="#2-3DGS" class="headerlink" title="2 3DGS"></a>2 3DGS</h1><h2 id="2-1-overview"><a href="#2-1-overview" class="headerlink" title="2.1 overview"></a>2.1 overview</h2><p>输入：一组静态照片+<strong>SfM估计的相机姿态与点云</strong></p>
 <p>选用高斯原因：各向异性体积可用于紧凑地表示精细结构</p>
 <p>用点云初始化高斯</p>
 <p><strong>高斯性质：mean（位置），covariance（形状），opacity（不透明度）</strong></p>
@@ -46,8 +50,9 @@
 <p><strong>提速</strong>的关键：<strong>Gaussians用GPU快排</strong></p>
 <p>流程图：</p>
 <p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%B5%81%E7%A8%8B%E5%9B%BE.png" alt="截屏2024-09-19 23.39.18.png"></p>
-<h3 id="2-2-可微的3dgs（构建高斯）"><a href="#2-2-可微的3dgs（构建高斯）" class="headerlink" title="2.2 可微的3dgs（构建高斯）"></a>2.2 可微的3dgs（构建高斯）</h3><p>为什么选择Gaussians：可微+方便投影成2D（可以快速α混合）</p>
-<p>3D Gaussian公式：<br>$$<br>G(x) &#x3D; e^{-\frac{1}{2}(x)^T\Sigma^{-1}(x)}<br>$$</p>
+<h2 id="2-2-可微的3dgs（构建高斯）"><a href="#2-2-可微的3dgs（构建高斯）" class="headerlink" title="2.2 可微的3dgs（构建高斯）"></a>2.2 可微的3dgs（构建高斯）</h2><p>为什么选择Gaussians：可微+方便投影成2D（可以快速α混合）</p>
+<p>3D Gaussian公式：</p>
+<p>$$<br>G(x) &#x3D; e^{-\frac{1}{2}(x)^T\Sigma^{-1}(x)}<br>$$</p>
 <p>PS：x为坐标矩阵；Σ为协方差矩阵，隐式地包含了mean（μ）信息</p>
 <p>混合时G(x)乘以α（不透明度）</p>
 <p>投影公式：</p>
@@ -57,10 +62,10 @@
 <p>高斯可以<strong>类椭球</strong>，用梯度下降<strong>改“Σ”→用梯度下降改“椭球3r+scale+rotate”</strong></p>
 <p>scaling：3D vector s</p>
 <p>rotation：四元数 q</p>
-<h3 id="2-3-3dgs自适应密度控制优化（优化高斯）"><a href="#2-3-3dgs自适应密度控制优化（优化高斯）" class="headerlink" title="2.3 3dgs自适应密度控制优化（优化高斯）"></a>2.3 3dgs自适应密度控制优化（优化高斯）</h3><p>不同位置3dgs密度不同 需要除点云初始化外的密度控制优化</p>
+<h2 id="2-3-3dgs自适应密度控制优化（优化高斯）"><a href="#2-3-3dgs自适应密度控制优化（优化高斯）" class="headerlink" title="2.3 3dgs自适应密度控制优化（优化高斯）"></a>2.3 3dgs自适应密度控制优化（优化高斯）</h2><p>不同位置3dgs密度不同 需要除点云初始化外的密度控制优化</p>
 <p><strong>需优化：μ，Σ，α，SH；密度（前后二者相关联）</strong></p>
 <ul>
-<li><h4 id="优化"><a href="#优化" class="headerlink" title="优化"></a>优化</h4><p>  用<strong>SGD</strong>（随机梯度下降）优化，支持定制的cuda kernel</p>
+<li><h3 id="优化"><a href="#优化" class="headerlink" title="优化"></a>优化</h3><p>  用<strong>SGD</strong>（随机梯度下降）优化，支持定制的cuda kernel</p>
 <p>  用<strong>sigmoid激活函数</strong>优化α，<strong>指数激活函数</strong>优化Σ的scale，以限制数据范围</p>
 <p>  初始化Σ（正实数*identity matrix）使得高斯为<strong>各向同性高斯</strong>，即分布密度值仅与到均值距离有关、与方向无关</p>
 <p>  以距离最近的三个点（SfM生成的点云）为标准生成初始化高斯</p>
@@ -69,7 +74,7 @@
 <p>  $$<br>  \mathcal{L} &#x3D; (1 - \lambda)\mathcal{L}<em>1 + \lambda\mathcal{L}</em>{D-SSIM}<br>  $$</p>
 <p>  PS：实验中λ取0.2</p>
 </li>
-<li><h4 id="自适应高斯控制"><a href="#自适应高斯控制" class="headerlink" title="自适应高斯控制"></a>自适应高斯控制</h4><p>  用稀疏点云初始化出的高斯很稀疏，需控制单位体积中的高斯数量</p>
+<li><h3 id="自适应高斯控制"><a href="#自适应高斯控制" class="headerlink" title="自适应高斯控制"></a>自适应高斯控制</h3><p>  用稀疏点云初始化出的高斯很稀疏，需控制单位体积中的高斯数量</p>
 <p>  预优化后，每100次迭代densify一次，并<strong>删除所有α值小于一个极小阈值的高斯</strong></p>
 <p>  关注<strong>高斯覆盖率极低（under-reconstruction）和单个高斯极大（over-reconstruction）</strong>的位置，因还原度低，此类位置<strong>视图-空间位置梯度</strong>很大</p>
 <p>  因此设置<strong>视图-空间位置梯度阈值</strong>（实验中取0.0002），超过阈值则需densify，优化过程如下图：</p>
@@ -79,14 +84,14 @@
 <p>  在视图中占比过大的高斯可能由于距相机过近或本身过大，会定期被清除，以保证画面质量、控制高斯总数。</p>
 </li>
 </ul>
-<h3 id="2-4-高斯的快速可微光栅化器（fast-3D→2D）"><a href="#2-4-高斯的快速可微光栅化器（fast-3D→2D）" class="headerlink" title="2.4 高斯的快速可微光栅化器（fast 3D→2D）"></a>2.4 高斯的快速可微光栅化器（fast 3D→2D）</h3><p>提速对象：投影渲染+高斯的快排（排相对视点的前后顺序，为了α混合）</p>
-<h4 id="该光栅化器特点："><a href="#该光栅化器特点：" class="headerlink" title="该光栅化器特点："></a><strong>该光栅化器特点：</strong></h4><ol>
+<h2 id="2-4-高斯的快速可微光栅化器（fast-3D→2D）"><a href="#2-4-高斯的快速可微光栅化器（fast-3D→2D）" class="headerlink" title="2.4 高斯的快速可微光栅化器（fast 3D→2D）"></a>2.4 高斯的快速可微光栅化器（fast 3D→2D）</h2><p>提速对象：投影渲染+高斯的快排（排相对视点的前后顺序，为了α混合）</p>
+<h3 id="该光栅化器特点："><a href="#该光栅化器特点：" class="headerlink" title="该光栅化器特点："></a>该光栅化器特点：</h3><ol>
 <li>为提速，先将所有高斯排序（距视点距离的顺序），再进行视角渲染；而非针对视角渲染的每个像素进行高斯排序</li>
 <li>支持高效反向传播算法</li>
 <li>内存占用小，每个像素固定占用一部分</li>
 <li><strong>光栅化管线可微</strong>，可投影各向异性高斯</li>
 </ol>
-<h4 id="渲染管线："><a href="#渲染管线：" class="headerlink" title="渲染管线："></a><strong>渲染管线：</strong></h4><ol>
+<h3 id="渲染管线："><a href="#渲染管线：" class="headerlink" title="渲染管线："></a>渲染管线：</h3><ol>
 <li><p>将屏幕<strong>分成多个16*16像素的瓦片（tiles）</strong></p>
 </li>
 <li><p>进行<strong>视锥体剔除（frustum culling）</strong>，以确定在视图范围内的高斯（只保留与视锥体相交99%置信区间的高斯）</p>
@@ -113,33 +118,33 @@
 </ul>
 </li>
 </ol>
-<h2 id="3-结果和总结"><a href="#3-结果和总结" class="headerlink" title="3 结果和总结"></a>3 结果和总结</h2><h3 id="3-1-结果评估"><a href="#3-1-结果评估" class="headerlink" title="3.1 结果评估"></a>3.1 结果评估</h3><p>pros：训练速度快，效果好</p>
+<h1 id="3-结果和总结"><a href="#3-结果和总结" class="headerlink" title="3 结果和总结"></a>3 结果和总结</h1><h2 id="3-1-结果评估"><a href="#3-1-结果评估" class="headerlink" title="3.1 结果评估"></a>3.1 结果评估</h2><p>pros：训练速度快，效果好</p>
 <p>cons：内存占用大（高斯太多（eg. 200k~500k），每个高斯的参数也多）</p>
 <p>尤其对比Nerf</p>
 <p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E7%BB%93%E6%9E%9C%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 10.22.37.png"></p>
-<h3 id="3-2-消融实验（ablation-study）"><a href="#3-2-消融实验（ablation-study）" class="headerlink" title="3.2 消融实验（ablation study）"></a>3.2 消融实验（ablation study）</h3><p>即评估不同条件&#x2F;参数等因素对于结果的影响的实验</p>
+<h2 id="3-2-消融实验（ablation-study）"><a href="#3-2-消融实验（ablation-study）" class="headerlink" title="3.2 消融实验（ablation study）"></a>3.2 消融实验（ablation study）</h2><p>即评估不同条件&#x2F;参数等因素对于结果的影响的实验</p>
 <ul>
-<li><h4 id="关于SfM"><a href="#关于SfM" class="headerlink" title="关于SfM"></a>关于SfM</h4><p>  实验对比了 <strong>用随机抽样初始化高斯 和 用SfM点云初始化高斯</strong> 得出的结果：</p>
+<li><h3 id="关于SfM"><a href="#关于SfM" class="headerlink" title="关于SfM"></a>关于SfM</h3><p>  实验对比了 <strong>用随机抽样初始化高斯 和 用SfM点云初始化高斯</strong> 得出的结果：</p>
 <p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/SfM%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 11.16.15.png"></p>
 <p>  渲染结果大体都不错，但前者会有画面细节问题，可能是由于有无法删除的漂浮物。</p>
 <p>  PS：SfM仅为一种估计方法，无法达到准确程度，后续研究若有更好方式，会提升效果。</p>
 </li>
-<li><h4 id="关于致密化（Densification）"><a href="#关于致密化（Densification）" class="headerlink" title="关于致密化（Densification）"></a><strong>关于致密化（Densification）</strong></h4><p>  实验对比了 <strong>通过克隆控制密度</strong>、<strong>通过分裂控制密度</strong> 和 <strong>通过克隆&amp;分裂控制密度</strong>（见2.3） 三种密度控制方式的结果：</p>
+<li><h3 id="关于致密化（Densification）"><a href="#关于致密化（Densification）" class="headerlink" title="关于致密化（Densification）"></a><strong>关于致密化（Densification）</strong></h3><p>  实验对比了 <strong>通过克隆控制密度</strong>、<strong>通过分裂控制密度</strong> 和 <strong>通过克隆&amp;分裂控制密度</strong>（见2.3） 三种密度控制方式的结果：</p>
 <p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E8%87%B4%E5%AF%86%E5%8C%96%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 11.20.44.png"></p>
 <p>  只克隆可能会出现类似迷雾的画面表现，只分裂可能会丢失细节，结合起来效果最好。</p>
 </li>
-<li><h4 id="对接收梯度的高斯数限制（靠后的高斯是否要变）"><a href="#对接收梯度的高斯数限制（靠后的高斯是否要变）" class="headerlink" title="对接收梯度的高斯数限制（靠后的高斯是否要变）"></a>对接收梯度的高斯数限制（靠后的高斯是否要变）</h4><p>  因后面的高斯对像素影响小（即使其α值较高），且不考虑靠后高斯可以提速，实验对比了 <strong>限制每个像素只有靠前的10个高斯接收梯度（左）</strong> 和 <strong>前文所述方法（右）</strong> 所得结果：</p>
+<li><h3 id="对接收梯度的高斯数限制（靠后的高斯是否要变）"><a href="#对接收梯度的高斯数限制（靠后的高斯是否要变）" class="headerlink" title="对接收梯度的高斯数限制（靠后的高斯是否要变）"></a>对接收梯度的高斯数限制（靠后的高斯是否要变）</h3><p>  因后面的高斯对像素影响小（即使其α值较高），且不考虑靠后高斯可以提速，实验对比了 <strong>限制每个像素只有靠前的10个高斯接收梯度（左）</strong> 和 <strong>前文所述方法（右）</strong> 所得结果：</p>
 <p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E5%89%8D10%E4%B8%AA%E9%AB%98%E6%96%AF%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 12.08.44.png"></p>
 <p>  限制靠后高斯的调整对最终效果是有影响的。这可能说明靠前高斯们的α值都不大，不足以覆盖靠后的高斯发挥作用。</p>
 </li>
-<li><h4 id="关于各向异性协方差"><a href="#关于各向异性协方差" class="headerlink" title="关于各向异性协方差"></a>关于各向异性协方差</h4><p>  实验对比了 <strong>使用各向异性协方差矩阵定义高斯</strong> 和 <strong>使用各向同性的一个r</strong>（减小内存占用）定义高斯 所得结果：</p>
+<li><h3 id="关于各向异性协方差"><a href="#关于各向异性协方差" class="headerlink" title="关于各向异性协方差"></a>关于各向异性协方差</h3><p>  实验对比了 <strong>使用各向异性协方差矩阵定义高斯</strong> 和 <strong>使用各向同性的一个r</strong>（减小内存占用）定义高斯 所得结果：</p>
 <p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E5%90%84%E5%90%91%E5%BC%82%E6%80%A7%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 12.48.02.png"></p>
 <p>  对比表明使用各向异性协方差矩阵图像呈现效果确实更好。</p>
 </li>
-<li><h4 id="关于球谐函数"><a href="#关于球谐函数" class="headerlink" title="关于球谐函数"></a>关于球谐函数</h4><p>  球谐函数的引入提高不同视角渲染质量</p>
+<li><h3 id="关于球谐函数"><a href="#关于球谐函数" class="headerlink" title="关于球谐函数"></a>关于球谐函数</h3><p>  球谐函数的引入提高不同视角渲染质量</p>
 </li>
 </ul>
-<h3 id="3-3-不足（技术不足与效果不足）"><a href="#3-3-不足（技术不足与效果不足）" class="headerlink" title="3.3 不足（技术不足与效果不足）"></a>3.3 不足（技术不足与效果不足）</h3><ol>
+<h2 id="3-3-不足（技术不足与效果不足）"><a href="#3-3-不足（技术不足与效果不足）" class="headerlink" title="3.3 不足（技术不足与效果不足）"></a>3.3 不足（技术不足与效果不足）</h2><ol>
 <li>未充分观察到的区域中会有<strong>artifacts（瑕疵、错误）</strong>（可能由于SfM初始化）</li>
 <li>某些区域会生成错误的长条形或“斑点状”的高斯</li>
 <li>实时渲染中可能会出错，体积大的高斯突然霸屏等（可能由于防护带草率地拒绝了部分高斯）</li>
@@ -147,7 +152,7 @@
 <li>未使用针对loss的正则化（添加惩罚项以防止模型过拟合）</li>
 <li>内存占用大（待优化）</li>
 </ol>
-<h3 id="3-4-总结"><a href="#3-4-总结" class="headerlink" title="3.4 总结"></a>3.4 总结</h3><p>3dgs是第一个用辐射场实现实时渲染的方法。</p>
+<h2 id="3-4-总结"><a href="#3-4-总结" class="headerlink" title="3.4 总结"></a>3.4 总结</h2><p>3dgs是第一个用辐射场实现实时渲染的方法。</p>
 <p>目前<strong>只有光栅化例程在优化的cuda kernel中实现</strong>，我们期望剩余的优化也可以移植到cuda中。</p>
 <p><strong>mesh（网格）</strong>在应用领域中占重要分量，因传统方法渲染更快，市场份额占比极大。因此将3dgs技术生成的高斯转为游戏制作等场景中需要的网格也是重要研究方向。</p>
 <p>此文中没有呈现的<strong>3D高斯分布可视化展示</strong>，对理解高斯的规律、优化算法，可能有很大帮助。</p>
