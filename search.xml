@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>first_publish</title>
-    <url>/2024/05/17/first-publish/</url>
-    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>欢迎访问</p>
-]]></content>
-      <categories>
-        <category>chitchat</category>
-      </categories>
-  </entry>
-  <entry>
     <title>【工具】tmux基本使用</title>
     <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
     <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
@@ -27,6 +18,21 @@
       <tags>
         <tag>Linux</tag>
         <tag>tmux</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【闲聊】first_publish</title>
+    <url>/2024/05/17/%E3%80%90%E9%97%B2%E8%81%8A%E3%80%91first-publish/</url>
+    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
+<h1 id="发布博客"><a href="#发布博客" class="headerlink" title="发布博客"></a>发布博客</h1><h2 id="1-创建新博客"><a href="#1-创建新博客" class="headerlink" title="1. 创建新博客"></a>1. 创建新博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo new [blog_name]    <span class="comment"># 创建新博客</span></span><br></pre></td></tr></table></figure>
+<h2 id="2-编辑博客"><a href="#2-编辑博客" class="headerlink" title="2. 编辑博客"></a>2. 编辑博客</h2><p>进行markdown编辑…<br>新博客默认路径：<code>source/_posts/[blog_name].md</code></p>
+<h2 id="3-发布博客"><a href="#3-发布博客" class="headerlink" title="3. 发布博客"></a>3. 发布博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo g</span><br><span class="line">hexo s  <span class="comment"># 可跳过</span></span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>闲聊</category>
+      </categories>
+      <tags>
+        <tag>blog</tag>
+        <tag>hexo</tag>
       </tags>
   </entry>
   <entry>
