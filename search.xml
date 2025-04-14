@@ -21,21 +21,6 @@
       </tags>
   </entry>
   <entry>
-    <title>【闲聊】first_publish</title>
-    <url>/2024/05/17/%E3%80%90%E9%97%B2%E8%81%8A%E3%80%91first-publish/</url>
-    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
-<h1 id="发布博客"><a href="#发布博客" class="headerlink" title="发布博客"></a>发布博客</h1><h2 id="1-创建新博客"><a href="#1-创建新博客" class="headerlink" title="1. 创建新博客"></a>1. 创建新博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo new [blog_name]    <span class="comment"># 创建新博客</span></span><br></pre></td></tr></table></figure>
-<h2 id="2-编辑博客"><a href="#2-编辑博客" class="headerlink" title="2. 编辑博客"></a>2. 编辑博客</h2><p>进行markdown编辑…<br>新博客默认路径：<code>source/_posts/[blog_name].md</code></p>
-<h2 id="3-发布博客"><a href="#3-发布博客" class="headerlink" title="3. 发布博客"></a>3. 发布博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo g</span><br><span class="line">hexo s  <span class="comment"># 可跳过</span></span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>闲聊</category>
-      </categories>
-      <tags>
-        <tag>blog</tag>
-        <tag>hexo</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>【论文笔记】3DGS精读</title>
     <url>/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/</url>
     <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br><br></p>
@@ -179,6 +164,21 @@ $$ -->
         <tag>CG</tag>
         <tag>paper</tag>
         <tag>neural-rendering</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【闲聊】first_publish</title>
+    <url>/2024/05/17/%E3%80%90%E9%97%B2%E8%81%8A%E3%80%91first-publish/</url>
+    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
+<h1 id="发布博客"><a href="#发布博客" class="headerlink" title="发布博客"></a>发布博客</h1><h2 id="1-创建新博客"><a href="#1-创建新博客" class="headerlink" title="1. 创建新博客"></a>1. 创建新博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo new [blog_name]    <span class="comment"># 创建新博客</span></span><br></pre></td></tr></table></figure>
+<h2 id="2-编辑博客"><a href="#2-编辑博客" class="headerlink" title="2. 编辑博客"></a>2. 编辑博客</h2><p>进行markdown编辑…<br>新博客默认路径：<code>source/_posts/[blog_name].md</code></p>
+<h2 id="3-发布博客"><a href="#3-发布博客" class="headerlink" title="3. 发布博客"></a>3. 发布博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo g</span><br><span class="line">hexo s  <span class="comment"># 可跳过</span></span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>闲聊</category>
+      </categories>
+      <tags>
+        <tag>blog</tag>
+        <tag>hexo</tag>
       </tags>
   </entry>
 </search>
