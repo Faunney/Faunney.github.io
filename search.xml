@@ -1,6 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>【工具】tmux基本使用</title>
+    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
+<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
+<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt install tmux	<span class="comment">#Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment">#CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment">#MacOS</span></span><br></pre></td></tr></table></figure>
+<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
+<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
+<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>工具</category>
+      </categories>
+      <tags>
+        <tag>Linux</tag>
+        <tag>tmux</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>【论文笔记】3DGS精读</title>
     <url>/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/</url>
     <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br><br></p>
@@ -144,26 +164,6 @@ $$ -->
         <tag>CG</tag>
         <tag>paper</tag>
         <tag>neural-rendering</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【工具】tmux基本使用</title>
-    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
-    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
-<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
-<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt install tmux	<span class="comment">#Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment">#CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment">#MacOS</span></span><br></pre></td></tr></table></figure>
-<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h3 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
-<h3 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
-<h3 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
-<h3 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
-<h3 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
-]]></content>
-      <categories>
-        <category>工具</category>
-      </categories>
-      <tags>
-        <tag>Linux</tag>
-        <tag>tmux</tag>
       </tags>
   </entry>
   <entry>
