@@ -1,26 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>【工具】tmux基本使用</title>
-    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
-    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
-<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
-<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt install tmux	<span class="comment">#Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment">#CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment">#MacOS</span></span><br></pre></td></tr></table></figure>
-<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
-<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
-<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
-]]></content>
-      <categories>
-        <category>工具</category>
-      </categories>
-      <tags>
-        <tag>linux</tag>
-        <tag>tmux</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>【论文笔记】3DGS精读</title>
     <url>/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/</url>
     <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br></p>
@@ -167,6 +147,26 @@ $$ -->
       </tags>
   </entry>
   <entry>
+    <title>【工具】tmux基本使用</title>
+    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
+<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
+<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt install tmux	<span class="comment">#Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment">#CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment">#MacOS</span></span><br></pre></td></tr></table></figure>
+<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
+<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
+<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>工具</category>
+      </categories>
+      <tags>
+        <tag>linux</tag>
+        <tag>tmux</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>【论文笔记】STAMP方法论精读</title>
     <url>/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/</url>
     <content><![CDATA[<p><strong>STAMP: Scalable Task And Model-agnostic Collaborative Perception 方法论部分精读</strong><br><br>项目网页链接：<a href="https://xiangbogaobarry.github.io/STAMP/">https://xiangbogaobarry.github.io/STAMP/</a></p>
@@ -187,7 +187,7 @@ $$ -->
 <p>本文所有CP都用中间融合</p>
 <p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
 <h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
-<img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" />
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" /></center>
 
 <ul>
 <li><strong>Encoding</strong>: input sensor data → BEV feature</li>
@@ -202,8 +202,8 @@ $$ -->
 </ul>
 <h1 id="STAMP框架"><a href="#STAMP框架" class="headerlink" title="STAMP框架"></a>STAMP框架</h1><p>用adaptation和reversion替代compression和decompression</p>
 <p>即设计adapter和reverter</p>
-<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" />
-<img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" />
+<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" /></center>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" /></center>
 
 <ul>
 <li>…</li>
@@ -217,10 +217,10 @@ $$ -->
 <li>…</li>
 </ul>
 <p>STAMP支持不同<strong>模态modality</strong>(eg. m1 m2 …)、<strong>模型架构model_architecture</strong>(eg. Encoder: Resnet101 EfficientNet)和<strong>下游任务downstream_task</strong>的代理。</p>
-<img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:500px" />
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:550px" /></center>
 
 <h1 id="协同特征对齐模块（CFA）"><a href="#协同特征对齐模块（CFA）" class="headerlink" title="协同特征对齐模块（CFA）"></a>协同特征对齐模块（CFA）</h1><p>CFA：用来训练统一的BEV feature表示和每个代理的adapter-reverter对</p>
-<img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:450px" />
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:500px" /></center>
 
 <h2 id="CFA训练流程："><a href="#CFA训练流程：" class="headerlink" title="CFA训练流程："></a>CFA训练流程：</h2><ol>
 <li><p>训练 protocol network</p>
@@ -234,28 +234,30 @@ $$ -->
 <p> Τ（模态变换函数）: Χ（周围环境状态） → I（输入数据）</p>
 <p> Ti是local model的传感器模态，Tp是protocol model的传感器模态。二者分别把传感器信息转化成Ii和Ip给Ei和Ep，再转化为Fi和Fp。</p>
 <p> 因此adapter的作用是填补T和E叠加出的domian gap，其训练的目标函数即Fp与Φi(Fi)的特征对齐损失。</p>
- <img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" />
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" /></center>
+ 
 <p> 对应地，reverter的目标函数可为Ψi(Fp)与Fi的特征对齐损失。而本文在此基础上增加了一个额外监督，即Ψi(Fp)与Ψi(Φi(Fi))的特征对齐损失。</p>
- <img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" />
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" /></center>
+ 
 <p> 对于这个“特征对齐”，将在特征空间和决策空间两处进行。</p>
 </li>
 <li><p>特征空间对齐</p>
 <p> 用L2-norm对齐Fp与Φi(Fi)、Ψi(Fp)与Fi、Ψi(Fp)与Ψi(Φi(Fi))。</p>
 <p> 共K个周围环境状态，因此共K组3对特征对</p>
- <img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" />
-</li>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" /></center>
+ </li>
 <li><p>决策空间对齐</p>
 <p> 此处损失函数是针对下游任务设计的，有local和protocol版本。GT为ground truth labels。</p>
- <img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" />
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" /></center>
 
 <p> 在此基础上加入权重，总损失函数如下：</p>
- <img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></li>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></center></li>
 </ol>
 <h1 id="adapter和reverter的结构"><a href="#adapter和reverter的结构" class="headerlink" title="adapter和reverter的结构"></a>adapter和reverter的结构</h1><p>domian gap三大来源：空间分辨率、feature patterns、通道尺寸。</p>
 <p>空间分辨率：采用简单的线性插值进行对齐</p>
 <p>feature patterns：用三个具有隐藏通道维度Chidden的ConvNeXt层对齐</p>
 <p>通道尺寸：用两个额外的卷积层对齐</p>
-<img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" />]]></content>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" /></center>]]></content>
       <categories>
         <category>论文笔记</category>
       </categories>
