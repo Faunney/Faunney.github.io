@@ -181,8 +181,12 @@ $$ -->
 <p>本文所有CP都用中间融合</p>
 <p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
 <h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
-<div align="center">
+<!-- <div align="center">
     <img src="STAMP论文阅读 19544705762780068f19d6e1d2c5bfec/截屏2025-04-16_10.22.29.png" alt="截屏2025-04-16 10.22.29" width="400"/>
+</div> -->
+
+<div align="center">
+    <img src="../img/STAMP论文阅读 19544705762780068f19d6e1d2c5bfec/截屏2025-04-16_10.22.29.png" alt="截屏2025-04-16 10.22.29" width="400"/>
 </div>
 
 <ul>
