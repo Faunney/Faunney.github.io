@@ -1,6 +1,121 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>【论文笔记】STAMP方法论精读</title>
+    <url>/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/</url>
+    <content><![CDATA[<p><strong>STAMP: Scalable Task And Model-agnostic Collaborative Perception 方法论部分精读</strong><br><br>项目网页链接：<a href="https://xiangbogaobarry.github.io/STAMP/">https://xiangbogaobarry.github.io/STAMP/</a></p>
+<p><strong>一句话总结</strong></p>
+<p>简易版：STAMP是一个改进版支持异构代理的协同感知框架。</p>
+<p>详细版：STAMP是一个为异构代理量身定制的可扩展的任务和模型不可知的协同感知框架。</p>
+<div class="timeline undefined"><div class='timeline-item headline'><div class='timeline-item-title'><div class='item-circle'><p>相关进展</p>
+</div></div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>OpenCOOD</p>
+</div></div><div class='timeline-item-content'><p>协同感知框架</p>
+</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>HEAL</p>
+</div></div><div class='timeline-item-content'><p>支持异构的协同感知框架</p>
+</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>STAMP</p>
+</div></div><div class='timeline-item-content'><p>方法改良的支持异构的协同感知框架</p>
+</div></div></div>
+
+
+<h1 id="现有CP-process"><a href="#现有CP-process" class="headerlink" title="现有CP process"></a>现有CP process</h1><p>N个代理（agent）每个都有自己的CP模型</p>
+<p>本文所有CP都用中间融合</p>
+<p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
+<h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" /></center>
+
+<ul>
+<li><strong>Encoding</strong>: input sensor data → BEV feature</li>
+<li><strong>Compression</strong>: BEV feature → compressed BEV feature</li>
+</ul>
+<p>📢 broadcasting compressed BEV feature to other agents in range δ</p>
+<p>📬 receiving other BEV features from other agents</p>
+<ul>
+<li><strong>Decompression</strong>: compressed BEV feature from j → BEV feature j (using decompressor i)</li>
+<li><strong>Fusion</strong>: all BEV features in range δ → new BEV feature i</li>
+<li><strong>Decoding</strong>: new BEV feature i → output i</li>
+</ul>
+<h1 id="STAMP框架"><a href="#STAMP框架" class="headerlink" title="STAMP框架"></a>STAMP框架</h1><p>用adaptation和reversion替代compression和decompression</p>
+<p>即设计adapter和reverter</p>
+<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" /></center>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" /></center>
+
+<ul>
+<li>…</li>
+<li><strong>Adaptation</strong>: local BEV feature i → protocol feature i (BEV)</li>
+</ul>
+<p>📢 broadcasting protocol feature to other agents in range δ</p>
+<p>📬 receiving other protocol features from other agents</p>
+<ul>
+<li><strong>Reversion</strong>: other protocol features → reverted protocol features</li>
+<li><strong>Fusion</strong>: reverted protocol features + locol BEV feature i → new BEV feature i</li>
+<li>…</li>
+</ul>
+<p>STAMP支持不同<strong>模态modality</strong>(eg. m1 m2 …)、<strong>模型架构model_architecture</strong>(eg. Encoder: Resnet101 EfficientNet)和<strong>下游任务downstream_task</strong>的代理。</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:550px" /></center>
+
+<h1 id="协同特征对齐模块（CFA）"><a href="#协同特征对齐模块（CFA）" class="headerlink" title="协同特征对齐模块（CFA）"></a>协同特征对齐模块（CFA）</h1><p>CFA：用来训练统一的BEV feature表示和每个代理的adapter-reverter对</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:500px" /></center>
+
+<h2 id="CFA训练流程："><a href="#CFA训练流程：" class="headerlink" title="CFA训练流程："></a>CFA训练流程：</h2><ol>
+<li><p>训练 protocol network</p>
+<p> 与传统CP流程类似</p>
+<p> protocol encoder: Ep</p>
+<p> (compressor and decompressor为恒等函数 即输入&#x3D;输出)</p>
+<p> protocol fusion model: Up</p>
+<p> protocol decoder: Dp</p>
+</li>
+<li><p>训练 local adapter-reverters</p>
+<p> Τ（模态变换函数）: Χ（周围环境状态） → I（输入数据）</p>
+<p> Ti是local model的传感器模态，Tp是protocol model的传感器模态。二者分别把传感器信息转化成Ii和Ip给Ei和Ep，再转化为Fi和Fp。</p>
+<p> 因此adapter的作用是填补T和E叠加出的domian gap，其训练的目标函数即Fp与Φi(Fi)的特征对齐损失。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" /></center>
+ 
+<p> 对应地，reverter的目标函数可为Ψi(Fp)与Fi的特征对齐损失。而本文在此基础上增加了一个额外监督，即Ψi(Fp)与Ψi(Φi(Fi))的特征对齐损失。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" /></center>
+ 
+<p> 对于这个“特征对齐”，将在特征空间和决策空间两处进行。</p>
+</li>
+<li><p>特征空间对齐</p>
+<p> 用L2-norm对齐Fp与Φi(Fi)、Ψi(Fp)与Fi、Ψi(Fp)与Ψi(Φi(Fi))。</p>
+<p> 共K个周围环境状态，因此共K组3对特征对</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" /></center>
+ </li>
+<li><p>决策空间对齐</p>
+<p> 此处损失函数是针对下游任务设计的，有local和protocol版本。GT为ground truth labels。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" /></center>
+
+<p> 在此基础上加入权重，总损失函数如下：</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></center></li>
+</ol>
+<h1 id="adapter和reverter的结构"><a href="#adapter和reverter的结构" class="headerlink" title="adapter和reverter的结构"></a>adapter和reverter的结构</h1><p>domian gap三大来源：空间分辨率、feature patterns、通道尺寸。</p>
+<p>空间分辨率：采用简单的线性插值进行对齐</p>
+<p>feature patterns：用三个具有隐藏通道维度Chidden的ConvNeXt层对齐</p>
+<p>通道尺寸：用两个额外的卷积层对齐</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" /></center>]]></content>
+      <categories>
+        <category>论文笔记</category>
+      </categories>
+      <tags>
+        <tag>paper</tag>
+        <tag>collaborative perception</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【闲聊】first_publish</title>
+    <url>/2024/05/17/%E3%80%90%E9%97%B2%E8%81%8A%E3%80%91first-publish/</url>
+    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
+<h1 id="发布博客"><a href="#发布博客" class="headerlink" title="发布博客"></a>发布博客</h1><h2 id="1-创建新博客"><a href="#1-创建新博客" class="headerlink" title="1. 创建新博客"></a>1. 创建新博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo new [blog_name]    <span class="comment"># 创建新博客</span></span><br></pre></td></tr></table></figure>
+<h2 id="2-编辑博客"><a href="#2-编辑博客" class="headerlink" title="2. 编辑博客"></a>2. 编辑博客</h2><p>进行markdown编辑…<br>新博客默认路径：<code>source/_posts/[blog_name].md</code></p>
+<h2 id="3-发布博客"><a href="#3-发布博客" class="headerlink" title="3. 发布博客"></a>3. 发布博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo g</span><br><span class="line">hexo s  <span class="comment"># 可跳过</span></span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>闲聊</category>
+      </categories>
+      <tags>
+        <tag>blog</tag>
+        <tag>hexo</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>【论文笔记】3DGS精读</title>
     <url>/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/</url>
     <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br></p>
@@ -141,8 +256,8 @@ $$ -->
         <category>论文笔记</category>
       </categories>
       <tags>
-        <tag>CG</tag>
         <tag>paper</tag>
+        <tag>CG</tag>
         <tag>neural-rendering</tag>
       </tags>
   </entry>
@@ -164,121 +279,6 @@ $$ -->
       <tags>
         <tag>linux</tag>
         <tag>tmux</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【论文笔记】STAMP方法论精读</title>
-    <url>/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/</url>
-    <content><![CDATA[<p><strong>STAMP: Scalable Task And Model-agnostic Collaborative Perception 方法论部分精读</strong><br><br>项目网页链接：<a href="https://xiangbogaobarry.github.io/STAMP/">https://xiangbogaobarry.github.io/STAMP/</a></p>
-<p><strong>一句话总结</strong></p>
-<p>简易版：STAMP是一个改进版支持异构代理的协同感知框架。</p>
-<p>详细版：STAMP是一个为异构代理量身定制的可扩展的任务和模型不可知的协同感知框架。</p>
-<div class="timeline undefined"><div class='timeline-item headline'><div class='timeline-item-title'><div class='item-circle'><p>相关进展</p>
-</div></div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>OpenCOOD</p>
-</div></div><div class='timeline-item-content'><p>协同感知框架</p>
-</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>HEAL</p>
-</div></div><div class='timeline-item-content'><p>支持异构的协同感知框架</p>
-</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>STAMP</p>
-</div></div><div class='timeline-item-content'><p>方法改良的支持异构的协同感知框架</p>
-</div></div></div>
-
-
-<h1 id="现有CP-process"><a href="#现有CP-process" class="headerlink" title="现有CP process"></a>现有CP process</h1><p>N个代理（agent）每个都有自己的CP模型</p>
-<p>本文所有CP都用中间融合</p>
-<p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
-<h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" /></center>
-
-<ul>
-<li><strong>Encoding</strong>: input sensor data → BEV feature</li>
-<li><strong>Compression</strong>: BEV feature → compressed BEV feature</li>
-</ul>
-<p>📢 broadcasting compressed BEV feature to other agents in range δ</p>
-<p>📬 receiving other BEV features from other agents</p>
-<ul>
-<li><strong>Decompression</strong>: compressed BEV feature from j → BEV feature j (using decompressor i)</li>
-<li><strong>Fusion</strong>: all BEV features in range δ → new BEV feature i</li>
-<li><strong>Decoding</strong>: new BEV feature i → output i</li>
-</ul>
-<h1 id="STAMP框架"><a href="#STAMP框架" class="headerlink" title="STAMP框架"></a>STAMP框架</h1><p>用adaptation和reversion替代compression和decompression</p>
-<p>即设计adapter和reverter</p>
-<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" /></center>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" /></center>
-
-<ul>
-<li>…</li>
-<li><strong>Adaptation</strong>: local BEV feature i → protocol feature i (BEV)</li>
-</ul>
-<p>📢 broadcasting protocol feature to other agents in range δ</p>
-<p>📬 receiving other protocol features from other agents</p>
-<ul>
-<li><strong>Reversion</strong>: other protocol features → reverted protocol features</li>
-<li><strong>Fusion</strong>: reverted protocol features + locol BEV feature i → new BEV feature i</li>
-<li>…</li>
-</ul>
-<p>STAMP支持不同<strong>模态modality</strong>(eg. m1 m2 …)、<strong>模型架构model_architecture</strong>(eg. Encoder: Resnet101 EfficientNet)和<strong>下游任务downstream_task</strong>的代理。</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:550px" /></center>
-
-<h1 id="协同特征对齐模块（CFA）"><a href="#协同特征对齐模块（CFA）" class="headerlink" title="协同特征对齐模块（CFA）"></a>协同特征对齐模块（CFA）</h1><p>CFA：用来训练统一的BEV feature表示和每个代理的adapter-reverter对</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:500px" /></center>
-
-<h2 id="CFA训练流程："><a href="#CFA训练流程：" class="headerlink" title="CFA训练流程："></a>CFA训练流程：</h2><ol>
-<li><p>训练 protocol network</p>
-<p> 与传统CP流程类似</p>
-<p> protocol encoder: Ep</p>
-<p> (compressor and decompressor为恒等函数 即输入&#x3D;输出)</p>
-<p> protocol fusion model: Up</p>
-<p> protocol decoder: Dp</p>
-</li>
-<li><p>训练 local adapter-reverters</p>
-<p> Τ（模态变换函数）: Χ（周围环境状态） → I（输入数据）</p>
-<p> Ti是local model的传感器模态，Tp是protocol model的传感器模态。二者分别把传感器信息转化成Ii和Ip给Ei和Ep，再转化为Fi和Fp。</p>
-<p> 因此adapter的作用是填补T和E叠加出的domian gap，其训练的目标函数即Fp与Φi(Fi)的特征对齐损失。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" /></center>
- 
-<p> 对应地，reverter的目标函数可为Ψi(Fp)与Fi的特征对齐损失。而本文在此基础上增加了一个额外监督，即Ψi(Fp)与Ψi(Φi(Fi))的特征对齐损失。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" /></center>
- 
-<p> 对于这个“特征对齐”，将在特征空间和决策空间两处进行。</p>
-</li>
-<li><p>特征空间对齐</p>
-<p> 用L2-norm对齐Fp与Φi(Fi)、Ψi(Fp)与Fi、Ψi(Fp)与Ψi(Φi(Fi))。</p>
-<p> 共K个周围环境状态，因此共K组3对特征对</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" /></center>
- </li>
-<li><p>决策空间对齐</p>
-<p> 此处损失函数是针对下游任务设计的，有local和protocol版本。GT为ground truth labels。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" /></center>
-
-<p> 在此基础上加入权重，总损失函数如下：</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></center></li>
-</ol>
-<h1 id="adapter和reverter的结构"><a href="#adapter和reverter的结构" class="headerlink" title="adapter和reverter的结构"></a>adapter和reverter的结构</h1><p>domian gap三大来源：空间分辨率、feature patterns、通道尺寸。</p>
-<p>空间分辨率：采用简单的线性插值进行对齐</p>
-<p>feature patterns：用三个具有隐藏通道维度Chidden的ConvNeXt层对齐</p>
-<p>通道尺寸：用两个额外的卷积层对齐</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" /></center>]]></content>
-      <categories>
-        <category>论文笔记</category>
-      </categories>
-      <tags>
-        <tag>paper</tag>
-        <tag>collaborative perception</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【闲聊】first_publish</title>
-    <url>/2024/05/17/%E3%80%90%E9%97%B2%E8%81%8A%E3%80%91first-publish/</url>
-    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
-<h1 id="发布博客"><a href="#发布博客" class="headerlink" title="发布博客"></a>发布博客</h1><h2 id="1-创建新博客"><a href="#1-创建新博客" class="headerlink" title="1. 创建新博客"></a>1. 创建新博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo new [blog_name]    <span class="comment"># 创建新博客</span></span><br></pre></td></tr></table></figure>
-<h2 id="2-编辑博客"><a href="#2-编辑博客" class="headerlink" title="2. 编辑博客"></a>2. 编辑博客</h2><p>进行markdown编辑…<br>新博客默认路径：<code>source/_posts/[blog_name].md</code></p>
-<h2 id="3-发布博客"><a href="#3-发布博客" class="headerlink" title="3. 发布博客"></a>3. 发布博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo g</span><br><span class="line">hexo s  <span class="comment"># 可跳过</span></span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>闲聊</category>
-      </categories>
-      <tags>
-        <tag>blog</tag>
-        <tag>hexo</tag>
       </tags>
   </entry>
 </search>
