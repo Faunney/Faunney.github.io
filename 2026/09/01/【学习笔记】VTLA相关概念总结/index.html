@@ -1,0 +1,305 @@
+<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>【学习笔记】VTLA相关概念总结 | iglues</title><meta name="author" content="Faunney"><meta name="copyright" content="Faunney"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="问题背景 接触密集型操作（Contact-Rich Manipulation）为什么视觉不够用  物体可能被手遮挡 需要判断有没有对齐、力度够不够、是否打滑   触觉能提供的信息类型  接触力&#x2F;摩擦&#x2F;滑动&#x2F;接触状态转移    硬件基础 视觉触觉传感器  GelSight&#x2F;DIGIT 等，原理：形变→内置摄像头成像 传感器内部有一层软胶皮肤，接触变形后由内置摄">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【学习笔记】VTLA相关概念总结">
+<meta property="og:url" content="http://example.com/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/index.html">
+<meta property="og:site_name" content="iglues">
+<meta property="og:description" content="问题背景 接触密集型操作（Contact-Rich Manipulation）为什么视觉不够用  物体可能被手遮挡 需要判断有没有对齐、力度够不够、是否打滑   触觉能提供的信息类型  接触力&#x2F;摩擦&#x2F;滑动&#x2F;接触状态转移    硬件基础 视觉触觉传感器  GelSight&#x2F;DIGIT 等，原理：形变→内置摄像头成像 传感器内部有一层软胶皮肤，接触变形后由内置摄">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/img/roller%20coaster.jpg">
+<meta property="article:published_time" content="2026-09-01T12:44:20.000Z">
+<meta property="article:modified_time" content="2026-09-06T10:45:31.237Z">
+<meta property="article:author" content="Faunney">
+<meta property="article:tag" content="VLA">
+<meta property="article:tag" content="VTLA">
+<meta property="article:tag" content="paper">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/img/roller%20coaster.jpg"><link rel="shortcut icon" href="/img/cat2.jpg"><link rel="canonical" href="http://example.com/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=4.13.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":5,"unescape":false,"languages":{"hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":500},
+  copy: {
+    success: 'Copy Successful',
+    error: 'Copy Error',
+    noSupport: 'Browser Not Supported'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: 'Just now',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.11.1/dist/infinitegrid.min.js',
+    buttonText: 'Load More'
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '【学习笔记】VTLA相关概念总结',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-09-06 18:45:31'
+}</script><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 6.3.0"></head><body><div id="web_bg"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/img/badboy.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">7</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">15</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">4</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/img/roller%20coaster.jpg')"><nav id="nav"><span id="blog-info"><a href="/" title="iglues"><span class="site-name">iglues</span></a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search" href="javascript:void(0);"><i class="fas fa-search fa-fw"></i><span> Search</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">【学习笔记】VTLA相关概念总结</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2026-09-01T12:44:20.000Z" title="Created 2026-09-01 20:44:20">2026-09-01</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2026-09-06T10:45:31.237Z" title="Updated 2026-09-06 18:45:31">2026-09-06</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/">学习笔记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">Word Count:</span><span class="word-count">1.8k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">Reading Time:</span><span>5mins</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="【学习笔记】VTLA相关概念总结"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><ul>
+<li><p>接触密集型操作（Contact-Rich Manipulation）为什么视觉不够用</p>
+<ul>
+<li>物体可能被手遮挡</li>
+<li>需要判断有没有对齐、力度够不够、是否打滑</li>
+</ul>
+</li>
+<li><p>触觉能提供的信息类型</p>
+<ul>
+<li>接触力&#x2F;摩擦&#x2F;滑动&#x2F;接触状态转移</li>
+</ul>
+</li>
+</ul>
+<h2 id="硬件基础"><a href="#硬件基础" class="headerlink" title="硬件基础"></a>硬件基础</h2><ul>
+<li><p>视觉触觉传感器</p>
+<ul>
+<li>GelSight&#x2F;DIGIT 等，原理：形变→内置摄像头成像</li>
+<li>传感器内部有一层软胶皮肤，接触变形后由内置摄像头拍照，再通过图像处理&#x2F;深度学习还原出接触形状、压力分布甚至滑动信息。</li>
+<li>本质上是把触觉问题转换成了图像问题，所以能直接复用视觉模型的架构（这也是为什么很多论文能把触觉塞进 VLA&#x2F;世界模型里）</li>
+</ul>
+</li>
+<li><p>力&#x2F;压力传感器类（直接输出物理量，非图像）</p>
+</li>
+<li><p>传感器异构性问题（型号&#x2F;分辨率&#x2F;安装位置不同导致的迁移难题）</p>
+</li>
+</ul>
+<h2 id="模型范式"><a href="#模型范式" class="headerlink" title="模型范式"></a>模型范式</h2><ul>
+<li><p>VLA（Vision-Language-Action）</p>
+<ul>
+<li>基本框架：观测 (O &#x3D; V + L) -&gt; 动作 (A)</li>
+<li>输入为</li>
+<li>输出为机器人动作序列（关节角度&#x2F;末端为姿等）</li>
+</ul>
+</li>
+<li><p>VTLA（Vision-Tactile-Language-Action）</p>
+<ul>
+<li>VLA基础上的扩展，加入tactile sensors</li>
+<li>问题：触觉信号怎么编码、怎么和VL对齐、怎么融合进动作生成</li>
+</ul>
+</li>
+<li><p>World Model</p>
+<ul>
+<li>路线：预测”下一步会怎样”，用于生成数据&#x2F;规划&#x2F;闭环校正</li>
+<li>O_t + A_t -&gt; O_t+1</li>
+<li>世界模型可以做：</li>
+<li>① 数据增强&#x2F;生成虚拟 rollout 训练数据；</li>
+<li>② 做 planning（在脑内试错，选最优动作再执行）；</li>
+<li>③ 做闭环校正（预测和真实触觉对不上时立刻纠偏）</li>
+</ul>
+</li>
+</ul>
+<h2 id="表征与编码"><a href="#表征与编码" class="headerlink" title="表征与编码"></a>表征与编码</h2><ul>
+<li><p>Encoder 的含义<br>  特征提取器（一段神经网络），区别于物理编码器（位移&#x2F;角度编码器）</p>
+</li>
+<li><p>特征向量&#x2F;embedding 的产生方式</p>
+<ul>
+<li>离散的L信息（通过tokenizer划分成token）通过embedding table（形状为[词表大小, 向量维度]的矩阵）方式获得初始向量（查找token对应的一行）</li>
+<li>连续的VT信息均通过特定训练的一段神经网络（encoder）得到特征向量（这个特征空间可以是语义空间（类似CLIP embedding做对齐），也可以是单独适配该encoder的空间）</li>
+<li>连续信号靠网络计算 vs 离散 token 查 embedding table</li>
+</ul>
+</li>
+<li><p>多模态对齐的本质：不同模态最终都变成同一空间下的向量&#x2F;token</p>
+<br></li>
+</ul>
+<h2 id="模态融合方式"><a href="#模态融合方式" class="headerlink" title="模态融合方式"></a>模态融合方式</h2><ul>
+<li><p>早期融合 vs 晚期融合</p>
+<ul>
+<li>早期融合：不同模态信息经过modality-specific encoder后，拼接一起进VLA backbone</li>
+<li>晚期融合：不同模态信息经过modality-specific encoder后，通过cross-attention等机制进行信息融合</li>
+<li>目前很多VLA模型中VL信息采用early fusion，state信息采用conditioning(融合进入head部分，而非late fusion)</li>
+</ul>
+</li>
+<li><p>Cross-attention &#x2F; cross-view attention</p>
+<ul>
+<li>若采用晚期融合，可以新增一个触觉编码器 + 新增的 cross-attention 层。</li>
+<li>例如触觉token做Query，视觉token做Key&#x2F;Value</li>
+</ul>
+</li>
+<li><p>Contact-aware fusion</p>
+<ul>
+<li>根据接触状态动态调整融合权重（包括VTL等信息的权重 &amp; 每种信息中某特定部分的权重，比如图像中的某部分）</li>
+</ul>
+</li>
+</ul>
+<h2 id="训练范式"><a href="#训练范式" class="headerlink" title="训练范式"></a>训练范式</h2><ul>
+<li><p>自监督预训练（对比学习、掩码重建——针对 encoder，无需动作标签）</p>
+<ul>
+<li>有动作标注的数据很稀缺，但无标签的数据很容易采集。因此在训练encoder时，往往可以先用无标签的数据，使之学会”怎么把原始信号压缩成有语义的特征向量”，后续可以冻结或微调encoder</li>
+<li>常见方法：</li>
+<li>对比学习（比如让同一时刻拍到的触觉图和视觉图的向量距离拉近，不同时刻&#x2F;不同物体的推远，类似 CLIP 的思路）；</li>
+<li>掩码重建（遮住触觉图的一部分，让模型学着补全，类似 MAE）。这两种都不需要动作标签。</li>
+</ul>
+</li>
+<li><p>模仿学习&#x2F;行为克隆（针对策略本身，需要示教数据里的动作标签）</p>
+</li>
+<li><p>微调 vs 全量微调 vs LoRA（后训练阶段的几种方式及各自代价）</p>
+<ul>
+<li>微调为“后训练”中的一种，在VLA中是指拿成熟的VLM模型，在自己的小规模机器人数据上训练，进而适应具体任务。</li>
+<li>全量微调是指，模型中所有参数都参与更新。效果通常最好但显存&#x2F;算力开销大，而且容易”灾难性遗忘”（把预训练学到的通用知识冲掉）</li>
+<li>LoRA：冻结原始权重，只在部分层（通常是注意力层）旁边插入两个小的低秩矩阵，只训练这两个小矩阵，参数量可能只有原模型的 0.1%~1%</li>
+</ul>
+</li>
+</ul>
+<h2 id="动作生成机制"><a href="#动作生成机制" class="headerlink" title="动作生成机制"></a>动作生成机制</h2><ul>
+<li>Diffusion Policy<ul>
+<li>用去噪过程建模多峰动作分布</li>
+<li>Policy即策略，用于 VLA 的 Diffusion model </li>
+<li>很多任务里”正确动作”不是唯一的，比如绕开障碍物可以往左也可以往右，这叫动作分布是多峰的（multimodal）。如果用普通回归去拟合多峰分布，模型会学出”左右取平均”这种谁都不对的动作。</li>
+<li>扩散模型天生擅长建模复杂&#x2F;多峰分布（它本质是在学一个概率分布，而不是学一个确定的函数）。所以 Diffusion Policy 就是：把”给定观测，生成一段动作”这件事，做成”以观测为条件，从噪声去噪出动作序列”的扩散过程。</li>
+<li>V + L + State（state 也可能在 head 中加入） -&gt; VLA backbone -&gt; head -&gt; Diffusion action head -&gt; Action chunk</li>
+</ul>
+</li>
+<li>Action Chunking（一次生成一段动作，receding horizon 执行）</li>
+</ul>
+<h2 id="控制与反馈"><a href="#控制与反馈" class="headerlink" title="控制与反馈"></a>控制与反馈</h2><ul>
+<li><p>开环执行的盲区（action chunk 执行期间为何”看不见”新变化）</p>
+<ul>
+<li>如果一次生成一个action chunk，执行完这一整段才重新看新观测”——这一整段执行期间，模型对新的触觉变化是”看不见&#x2F;不响应”的，是开环执行</li>
+</ul>
+</li>
+<li><p>高频反射式校正（低层快速闭环 vs 高层慢速规划的分工）</p>
+<ul>
+<li>可单独设计一个小模块，比较”世界模型&#x2F;上一步预测的触觉信号”和”传感器实际测到的触觉信号”，如果有偏差（比如实际接触力比预测的大很多，说明可能要打滑了），就在当前正在执行的动作 chunk 上做一个小幅度的实时修正，而不必等下一次完整的大模型推理。</li>
+<li>大模型的完整推理循环像是”深思熟虑做计划”，而这个高频反射校正更像是人被烫到时的脊髓反射——不用等大脑（VLA）反应过来，先做个快速的局部纠正动作。</li>
+</ul>
+</li>
+</ul>
+<h2 id="数据处理"><a href="#数据处理" class="headerlink" title="数据处理"></a>数据处理</h2><ul>
+<li><p>遥操作采集及其成本问题</p>
+<ul>
+<li>遥操作（teleoperation）可以粗暴理解为遥控机器人工作来采集数据</li>
+</ul>
+</li>
+<li><p>Robot-free &#x2F; 免机器人采集方案</p>
+<ul>
+<li>新兴方法是直接用手持设备采集视触觉数据。比如让环卫工人每天带上专用手套获取大量样本。但此类方法问题是如何解决“人手采集数据和机器人执行时数据的差异”。</li>
+</ul>
+</li>
+<li><p>多模态时间同步（视觉&#x2F;触觉采样率不一致）</p>
+</li>
+<li><p>跨传感器数据归一化</p>
+</li>
+</ul>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>Author: </span><span class="post-copyright-info"><a href="http://example.com">Faunney</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>Link: </span><span class="post-copyright-info"><a href="http://example.com/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/">http://example.com/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>Copyright Notice: </span><span class="post-copyright-info">All articles in this blog are licensed under <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> unless stating additionally.</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/VLA/">VLA</a><a class="post-meta__tags" href="/tags/VTLA/">VTLA</a><a class="post-meta__tags" href="/tags/paper/">paper</a></div><div class="post_share"><div class="social-share" data-image="/img/roller%20coaster.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="next-post pull-full"><a href="/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/" title="【散记】PE考核探索报告"><img class="cover" src="/img/roller%20coaster.jpg" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">Next</div><div class="next_info">【散记】PE考核探索报告</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>Related Articles</span></div><div class="relatedPosts-list"><div><a href="/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/" title="【论文笔记】3DGS精读"><img class="cover" src="/img/roller%20coaster.jpg" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2024-09-21</div><div class="title">【论文笔记】3DGS精读</div></div></a></div><div><a href="/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/" title="【论文笔记】STAMP方法论精读"><img class="cover" src="/img/roller%20coaster.jpg" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2025-04-23</div><div class="title">【论文笔记】STAMP方法论精读</div></div></a></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/img/badboy.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">Faunney</div><div class="author-info__description"></div></div><div class="card-info-data site-data is-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">7</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">15</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">4</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Faunney"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/Faunney" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:faunney@icloud.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #24292e;"></i></a><a class="social-icon" href="/img/Weixin.jpg" target="_blank" title="Weixin"><i class="fa-brands fa-weixin" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">感谢访问～欢迎交流</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%E8%83%8C%E6%99%AF"><span class="toc-number">1.</span> <span class="toc-text">问题背景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%A1%AC%E4%BB%B6%E5%9F%BA%E7%A1%80"><span class="toc-number">2.</span> <span class="toc-text">硬件基础</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A8%A1%E5%9E%8B%E8%8C%83%E5%BC%8F"><span class="toc-number">3.</span> <span class="toc-text">模型范式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A1%A8%E5%BE%81%E4%B8%8E%E7%BC%96%E7%A0%81"><span class="toc-number">4.</span> <span class="toc-text">表征与编码</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A8%A1%E6%80%81%E8%9E%8D%E5%90%88%E6%96%B9%E5%BC%8F"><span class="toc-number">5.</span> <span class="toc-text">模态融合方式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AE%AD%E7%BB%83%E8%8C%83%E5%BC%8F"><span class="toc-number">6.</span> <span class="toc-text">训练范式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8A%A8%E4%BD%9C%E7%94%9F%E6%88%90%E6%9C%BA%E5%88%B6"><span class="toc-number">7.</span> <span class="toc-text">动作生成机制</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8E%A7%E5%88%B6%E4%B8%8E%E5%8F%8D%E9%A6%88"><span class="toc-number">8.</span> <span class="toc-text">控制与反馈</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%95%B0%E6%8D%AE%E5%A4%84%E7%90%86"><span class="toc-number">9.</span> <span class="toc-text">数据处理</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Post</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/" title="【学习笔记】VTLA相关概念总结"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【学习笔记】VTLA相关概念总结"/></a><div class="content"><a class="title" href="/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/" title="【学习笔记】VTLA相关概念总结">【学习笔记】VTLA相关概念总结</a><time datetime="2026-09-01T12:44:20.000Z" title="Created 2026-09-01 20:44:20">2026-09-01</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/" title="【散记】PE考核探索报告"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【散记】PE考核探索报告"/></a><div class="content"><a class="title" href="/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/" title="【散记】PE考核探索报告">【散记】PE考核探索报告</a><time datetime="2025-05-14T06:54:49.000Z" title="Created 2025-05-14 14:54:49">2025-05-14</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/" title="【论文笔记】OpenGaussian"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【论文笔记】OpenGaussian"/></a><div class="content"><a class="title" href="/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/" title="【论文笔记】OpenGaussian">【论文笔记】OpenGaussian</a><time datetime="2025-05-14T06:54:49.000Z" title="Created 2025-05-14 14:54:49">2025-05-14</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/" title="【论文笔记】STAMP方法论精读"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【论文笔记】STAMP方法论精读"/></a><div class="content"><a class="title" href="/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/" title="【论文笔记】STAMP方法论精读">【论文笔记】STAMP方法论精读</a><time datetime="2025-04-23T02:09:34.000Z" title="Created 2025-04-23 10:09:34">2025-04-23</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" title="【工具】tmux基本使用"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【工具】tmux基本使用"/></a><div class="content"><a class="title" href="/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" title="【工具】tmux基本使用">【工具】tmux基本使用</a><time datetime="2025-04-14T08:58:15.000Z" title="Created 2025-04-14 16:58:15">2025-04-14</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2024.03 - 2026 By Faunney</div><div class="framework-info"><span>Framework </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>Theme </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Read Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light And Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Setting"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table Of Contents"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="Back To Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=4.13.0"></script><script src="/js/main.js?v=4.13.0"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.umd.min.js"></script><div class="js-pjax"></div><canvas class="fireworks" mobile="false"></canvas><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/fireworks.min.js"></script><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/activate-power-mode.min.js"></script><script>POWERMODE.colorful = true;
+POWERMODE.shake = true;
+POWERMODE.mobile = true;
+document.body.addEventListener('input', POWERMODE);
+</script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">Search</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="is-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  Loading the Database</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="Search for Posts" type="text"/></div></div><hr/><div id="local-search-results"></div><div id="local-search-stats-wrap"></div></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=4.13.0"></script></div></div></body></html>

@@ -1,6 +1,197 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>【学习笔记】VTLA相关概念总结</title>
+    <url>/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/</url>
+    <content><![CDATA[<h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><ul>
+<li><p>接触密集型操作（Contact-Rich Manipulation）为什么视觉不够用</p>
+<ul>
+<li>物体可能被手遮挡</li>
+<li>需要判断有没有对齐、力度够不够、是否打滑</li>
+</ul>
+</li>
+<li><p>触觉能提供的信息类型</p>
+<ul>
+<li>接触力&#x2F;摩擦&#x2F;滑动&#x2F;接触状态转移</li>
+</ul>
+</li>
+</ul>
+<h2 id="硬件基础"><a href="#硬件基础" class="headerlink" title="硬件基础"></a>硬件基础</h2><ul>
+<li><p>视觉触觉传感器</p>
+<ul>
+<li>GelSight&#x2F;DIGIT 等，原理：形变→内置摄像头成像</li>
+<li>传感器内部有一层软胶皮肤，接触变形后由内置摄像头拍照，再通过图像处理&#x2F;深度学习还原出接触形状、压力分布甚至滑动信息。</li>
+<li>本质上是把触觉问题转换成了图像问题，所以能直接复用视觉模型的架构（这也是为什么很多论文能把触觉塞进 VLA&#x2F;世界模型里）</li>
+</ul>
+</li>
+<li><p>力&#x2F;压力传感器类（直接输出物理量，非图像）</p>
+</li>
+<li><p>传感器异构性问题（型号&#x2F;分辨率&#x2F;安装位置不同导致的迁移难题）</p>
+</li>
+</ul>
+<h2 id="模型范式"><a href="#模型范式" class="headerlink" title="模型范式"></a>模型范式</h2><ul>
+<li><p>VLA（Vision-Language-Action）</p>
+<ul>
+<li>基本框架：观测 (O &#x3D; V + L) -&gt; 动作 (A)</li>
+<li>输入为</li>
+<li>输出为机器人动作序列（关节角度&#x2F;末端为姿等）</li>
+</ul>
+</li>
+<li><p>VTLA（Vision-Tactile-Language-Action）</p>
+<ul>
+<li>VLA基础上的扩展，加入tactile sensors</li>
+<li>问题：触觉信号怎么编码、怎么和VL对齐、怎么融合进动作生成</li>
+</ul>
+</li>
+<li><p>World Model</p>
+<ul>
+<li>路线：预测”下一步会怎样”，用于生成数据&#x2F;规划&#x2F;闭环校正</li>
+<li>O_t + A_t -&gt; O_t+1</li>
+<li>世界模型可以做：</li>
+<li>① 数据增强&#x2F;生成虚拟 rollout 训练数据；</li>
+<li>② 做 planning（在脑内试错，选最优动作再执行）；</li>
+<li>③ 做闭环校正（预测和真实触觉对不上时立刻纠偏）</li>
+</ul>
+</li>
+</ul>
+<h2 id="表征与编码"><a href="#表征与编码" class="headerlink" title="表征与编码"></a>表征与编码</h2><ul>
+<li><p>Encoder 的含义<br>  特征提取器（一段神经网络），区别于物理编码器（位移&#x2F;角度编码器）</p>
+</li>
+<li><p>特征向量&#x2F;embedding 的产生方式</p>
+<ul>
+<li>离散的L信息（通过tokenizer划分成token）通过embedding table（形状为[词表大小, 向量维度]的矩阵）方式获得初始向量（查找token对应的一行）</li>
+<li>连续的VT信息均通过特定训练的一段神经网络（encoder）得到特征向量（这个特征空间可以是语义空间（类似CLIP embedding做对齐），也可以是单独适配该encoder的空间）</li>
+<li>连续信号靠网络计算 vs 离散 token 查 embedding table</li>
+</ul>
+</li>
+<li><p>多模态对齐的本质：不同模态最终都变成同一空间下的向量&#x2F;token</p>
+<br></li>
+</ul>
+<h2 id="模态融合方式"><a href="#模态融合方式" class="headerlink" title="模态融合方式"></a>模态融合方式</h2><ul>
+<li><p>早期融合 vs 晚期融合</p>
+<ul>
+<li>早期融合：不同模态信息经过modality-specific encoder后，拼接一起进VLA backbone</li>
+<li>晚期融合：不同模态信息经过modality-specific encoder后，通过cross-attention等机制进行信息融合</li>
+<li>目前很多VLA模型中VL信息采用early fusion，state信息采用conditioning(融合进入head部分，而非late fusion)</li>
+</ul>
+</li>
+<li><p>Cross-attention &#x2F; cross-view attention</p>
+<ul>
+<li>若采用晚期融合，可以新增一个触觉编码器 + 新增的 cross-attention 层。</li>
+<li>例如触觉token做Query，视觉token做Key&#x2F;Value</li>
+</ul>
+</li>
+<li><p>Contact-aware fusion</p>
+<ul>
+<li>根据接触状态动态调整融合权重（包括VTL等信息的权重 &amp; 每种信息中某特定部分的权重，比如图像中的某部分）</li>
+</ul>
+</li>
+</ul>
+<h2 id="训练范式"><a href="#训练范式" class="headerlink" title="训练范式"></a>训练范式</h2><ul>
+<li><p>自监督预训练（对比学习、掩码重建——针对 encoder，无需动作标签）</p>
+<ul>
+<li>有动作标注的数据很稀缺，但无标签的数据很容易采集。因此在训练encoder时，往往可以先用无标签的数据，使之学会”怎么把原始信号压缩成有语义的特征向量”，后续可以冻结或微调encoder</li>
+<li>常见方法：</li>
+<li>对比学习（比如让同一时刻拍到的触觉图和视觉图的向量距离拉近，不同时刻&#x2F;不同物体的推远，类似 CLIP 的思路）；</li>
+<li>掩码重建（遮住触觉图的一部分，让模型学着补全，类似 MAE）。这两种都不需要动作标签。</li>
+</ul>
+</li>
+<li><p>模仿学习&#x2F;行为克隆（针对策略本身，需要示教数据里的动作标签）</p>
+</li>
+<li><p>微调 vs 全量微调 vs LoRA（后训练阶段的几种方式及各自代价）</p>
+<ul>
+<li>微调为“后训练”中的一种，在VLA中是指拿成熟的VLM模型，在自己的小规模机器人数据上训练，进而适应具体任务。</li>
+<li>全量微调是指，模型中所有参数都参与更新。效果通常最好但显存&#x2F;算力开销大，而且容易”灾难性遗忘”（把预训练学到的通用知识冲掉）</li>
+<li>LoRA：冻结原始权重，只在部分层（通常是注意力层）旁边插入两个小的低秩矩阵，只训练这两个小矩阵，参数量可能只有原模型的 0.1%~1%</li>
+</ul>
+</li>
+</ul>
+<h2 id="动作生成机制"><a href="#动作生成机制" class="headerlink" title="动作生成机制"></a>动作生成机制</h2><ul>
+<li>Diffusion Policy<ul>
+<li>用去噪过程建模多峰动作分布</li>
+<li>Policy即策略，用于 VLA 的 Diffusion model </li>
+<li>很多任务里”正确动作”不是唯一的，比如绕开障碍物可以往左也可以往右，这叫动作分布是多峰的（multimodal）。如果用普通回归去拟合多峰分布，模型会学出”左右取平均”这种谁都不对的动作。</li>
+<li>扩散模型天生擅长建模复杂&#x2F;多峰分布（它本质是在学一个概率分布，而不是学一个确定的函数）。所以 Diffusion Policy 就是：把”给定观测，生成一段动作”这件事，做成”以观测为条件，从噪声去噪出动作序列”的扩散过程。</li>
+<li>V + L + State（state 也可能在 head 中加入） -&gt; VLA backbone -&gt; head -&gt; Diffusion action head -&gt; Action chunk</li>
+</ul>
+</li>
+<li>Action Chunking（一次生成一段动作，receding horizon 执行）</li>
+</ul>
+<h2 id="控制与反馈"><a href="#控制与反馈" class="headerlink" title="控制与反馈"></a>控制与反馈</h2><ul>
+<li><p>开环执行的盲区（action chunk 执行期间为何”看不见”新变化）</p>
+<ul>
+<li>如果一次生成一个action chunk，执行完这一整段才重新看新观测”——这一整段执行期间，模型对新的触觉变化是”看不见&#x2F;不响应”的，是开环执行</li>
+</ul>
+</li>
+<li><p>高频反射式校正（低层快速闭环 vs 高层慢速规划的分工）</p>
+<ul>
+<li>可单独设计一个小模块，比较”世界模型&#x2F;上一步预测的触觉信号”和”传感器实际测到的触觉信号”，如果有偏差（比如实际接触力比预测的大很多，说明可能要打滑了），就在当前正在执行的动作 chunk 上做一个小幅度的实时修正，而不必等下一次完整的大模型推理。</li>
+<li>大模型的完整推理循环像是”深思熟虑做计划”，而这个高频反射校正更像是人被烫到时的脊髓反射——不用等大脑（VLA）反应过来，先做个快速的局部纠正动作。</li>
+</ul>
+</li>
+</ul>
+<h2 id="数据处理"><a href="#数据处理" class="headerlink" title="数据处理"></a>数据处理</h2><ul>
+<li><p>遥操作采集及其成本问题</p>
+<ul>
+<li>遥操作（teleoperation）可以粗暴理解为遥控机器人工作来采集数据</li>
+</ul>
+</li>
+<li><p>Robot-free &#x2F; 免机器人采集方案</p>
+<ul>
+<li>新兴方法是直接用手持设备采集视触觉数据。比如让环卫工人每天带上专用手套获取大量样本。但此类方法问题是如何解决“人手采集数据和机器人执行时数据的差异”。</li>
+</ul>
+</li>
+<li><p>多模态时间同步（视觉&#x2F;触觉采样率不一致）</p>
+</li>
+<li><p>跨传感器数据归一化</p>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>学习笔记</category>
+      </categories>
+      <tags>
+        <tag>VLA</tag>
+        <tag>VTLA</tag>
+        <tag>paper</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【工具】tmux基本使用</title>
+    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
+<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
+<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt install tmux	<span class="comment">#Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment">#CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment">#MacOS</span></span><br></pre></td></tr></table></figure>
+<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
+<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
+<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>工具</category>
+      </categories>
+      <tags>
+        <tag>linux</tag>
+        <tag>tmux</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【散记】first_publish</title>
+    <url>/2024/05/17/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91first-publish/</url>
+    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
+<h1 id="发布博客"><a href="#发布博客" class="headerlink" title="发布博客"></a>发布博客</h1><h2 id="1-创建新博客"><a href="#1-创建新博客" class="headerlink" title="1. 创建新博客"></a>1. 创建新博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo new [blog_name]    <span class="comment"># 创建新博客</span></span><br></pre></td></tr></table></figure>
+<h2 id="2-编辑博客"><a href="#2-编辑博客" class="headerlink" title="2. 编辑博客"></a>2. 编辑博客</h2><p>进行markdown编辑…<br>新博客默认路径：<code>source/_posts/[blog_name].md</code></p>
+<h2 id="3-发布博客"><a href="#3-发布博客" class="headerlink" title="3. 发布博客"></a>3. 发布博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo g</span><br><span class="line">hexo s  <span class="comment"># 可跳过</span></span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>散记</category>
+      </categories>
+      <tags>
+        <tag>blog</tag>
+        <tag>hexo</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>【论文笔记】3DGS精读</title>
     <url>/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/</url>
     <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br></p>
@@ -141,24 +332,9 @@ $$ -->
         <category>论文笔记</category>
       </categories>
       <tags>
-        <tag>CG</tag>
         <tag>paper</tag>
+        <tag>CG</tag>
         <tag>neural-rendering</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【散记】first_publish</title>
-    <url>/2024/05/17/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91first-publish/</url>
-    <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
-<h1 id="发布博客"><a href="#发布博客" class="headerlink" title="发布博客"></a>发布博客</h1><h2 id="1-创建新博客"><a href="#1-创建新博客" class="headerlink" title="1. 创建新博客"></a>1. 创建新博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo new [blog_name]    <span class="comment"># 创建新博客</span></span><br></pre></td></tr></table></figure>
-<h2 id="2-编辑博客"><a href="#2-编辑博客" class="headerlink" title="2. 编辑博客"></a>2. 编辑博客</h2><p>进行markdown编辑…<br>新博客默认路径：<code>source/_posts/[blog_name].md</code></p>
-<h2 id="3-发布博客"><a href="#3-发布博客" class="headerlink" title="3. 发布博客"></a>3. 发布博客</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo g</span><br><span class="line">hexo s  <span class="comment"># 可跳过</span></span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>散记</category>
-      </categories>
-      <tags>
-        <tag>blog</tag>
-        <tag>hexo</tag>
       </tags>
   </entry>
   <entry>
@@ -221,23 +397,312 @@ $$ -->
       </tags>
   </entry>
   <entry>
-    <title>【工具】tmux基本使用</title>
-    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
-    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
-<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
-<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt install tmux	<span class="comment">#Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment">#CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment">#MacOS</span></span><br></pre></td></tr></table></figure>
-<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
-<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
-<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
+    <title>【论文笔记】OpenGaussian</title>
+    <url>/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/</url>
+    <content><![CDATA[<h2 id="论文是做什么的"><a href="#论文是做什么的" class="headerlink" title="论文是做什么的"></a>论文是做什么的</h2><p>OpenGaussian（NeurIPS 2024）解决的问题是：给定一个 3D 场景，能不能用自然语言查询找到对应的物体，并精确定位到 3D 点级别。</p>
+<p>这个问题以前也有人做，但大多数方法是在 2D 像素级别做语义理解，3D 只是顺带的。OpenGaussian 的出发点是：直接给每个 3D Gaussian 关联一个语义特征，这样查询结果天然就是 3D 点级别的，不需要从 2D 反投影。</p>
+<p>场景表示用的是 3D Gaussian Splatting（3DGS）。3DGS 把场景表示成一堆椭球形的高斯球，每个球有位置、颜色、透明度等属性，渲染速度很快。OpenGaussian 在每个高斯球上额外加了一个实例特征向量，用来区分不同物体。</p>
+<h2 id="方法：四个阶段"><a href="#方法：四个阶段" class="headerlink" title="方法：四个阶段"></a>方法：四个阶段</h2><p>整个训练流程分四个阶段，逻辑上是递进的。</p>
+<p><strong>Stage 0：标准 3DGS 预训练。</strong> 先把 RGB 渲染质量训好，30000 步，不涉及语义特征。</p>
+<p><strong>Stage 1：连续实例特征学习。</strong> 开始给每个高斯球训练 6 维实例特征。监督信号来自 SAM 分割出的 2D mask——同一个 mask 内的像素特征应该相近（cohesion loss），不同 mask 之间的特征应该尽量远离（separation loss）。这一阶段训出来的特征是连续的，还没有离散化。</p>
+<p><strong>Stage 2：两级 Codebook 离散化。</strong> 把连续特征量化成离散的 cluster ID。先做粗粒度聚类（k1 个 root cluster），再在每个 root 内部做细粒度聚类（k2 个 leaf cluster）。最终每个高斯球有一个 leaf cluster ID，空间上相近且特征相似的点会被分到同一个 cluster。</p>
+<p><strong>Stage 3：2D 语言特征关联。</strong> 训练结束后，把每个 3D leaf cluster 和 2D SAM mask 做关联，把 mask 对应的 CLIP 语言特征聚合进来。推理时，把文本编码成 CLIP 特征，和每个 cluster 的语言特征做 cosine similarity，找最相似的 cluster 渲染出来，就是查询结果。</p>
+<p>Stage 3 是一个 training-free 的后处理步骤，不影响前面的 3DGS 参数，但对最终检索质量影响很大。</p>
+<h2 id="Baseline-结果"><a href="#Baseline-结果" class="headerlink" title="Baseline 结果"></a>Baseline 结果</h2><p>在 <code>ramen</code> 场景上跑 OpenGaussian 的文本选物体流程，整体结果是：<code>mIoU = 0.2027</code>，<code>Acc@0.25 = 0.2958</code>，<code>Acc@0.5 = 0.1690</code>。只看总分很难判断问题出在哪里，把结果按 query 拆开统计：</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th align="right">出现次数</th>
+<th align="right">成功预测次数</th>
+<th align="right">缺预测次数</th>
+<th align="right">成功率</th>
+<th align="right">成功样本平均 IoU</th>
+<th align="right">最佳 IoU</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>bowl</td>
+<td align="right">5</td>
+<td align="right">2</td>
+<td align="right">3</td>
+<td align="right">0.400</td>
+<td align="right">0.2272</td>
+<td align="right">0.2745</td>
+</tr>
+<tr>
+<td>chopsticks</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.6155</td>
+<td align="right">0.8139</td>
+</tr>
+<tr>
+<td>corn</td>
+<td align="right">5</td>
+<td align="right">5</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0004</td>
+<td align="right">0.0020</td>
+</tr>
+<tr>
+<td>egg</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.3927</td>
+<td align="right">0.4855</td>
+</tr>
+<tr>
+<td>glass of water</td>
+<td align="right">2</td>
+<td align="right">0</td>
+<td align="right">2</td>
+<td align="right">0.000</td>
+<td align="right">0.0000</td>
+<td align="right">0.0000</td>
+</tr>
+<tr>
+<td>hand</td>
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0000</td>
+<td align="right">0.0000</td>
+</tr>
+<tr>
+<td>kamaboko</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0723</td>
+<td align="right">0.0839</td>
+</tr>
+<tr>
+<td>napkin</td>
+<td align="right">5</td>
+<td align="right">3</td>
+<td align="right">2</td>
+<td align="right">0.600</td>
+<td align="right">0.1835</td>
+<td align="right">0.5506</td>
+</tr>
+<tr>
+<td>nori</td>
+<td align="right">6</td>
+<td align="right">6</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.7713</td>
+<td align="right">0.8372</td>
+</tr>
+<tr>
+<td>onion segments</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0003</td>
+<td align="right">0.0017</td>
+</tr>
+<tr>
+<td>plate</td>
+<td align="right">4</td>
+<td align="right">0</td>
+<td align="right">4</td>
+<td align="right">0.000</td>
+<td align="right">0.0000</td>
+<td align="right">0.0000</td>
+</tr>
+<tr>
+<td>sake cup</td>
+<td align="right">6</td>
+<td align="right">3</td>
+<td align="right">3</td>
+<td align="right">0.500</td>
+<td align="right">0.0002</td>
+<td align="right">0.0006</td>
+</tr>
+<tr>
+<td>spoon</td>
+<td align="right">2</td>
+<td align="right">2</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0185</td>
+<td align="right">0.0370</td>
+</tr>
+<tr>
+<td>wavy noodles</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.1650</td>
+<td align="right">0.2394</td>
+</tr>
+</tbody></table>
+<p>两个比较明显的现象：第一，有些目标能稳定生成预测且 IoU 较高，例如 <code>nori</code> 和 <code>chopsticks</code>。第二，有些目标虽然能生成预测但 IoU 很差，例如 <code>corn</code> 和 <code>onion segments</code>；还有一些目标经常无法生成预测，例如 <code>glass of water</code>、<code>plate</code> 和 <code>sake cup</code>。</p>
+<h2 id="失败模式"><a href="#失败模式" class="headerlink" title="失败模式"></a>失败模式</h2><p>结合原图、SAM mask 和最终的 <code>silhouette</code> 结果，失败大致分成两类。</p>
+<p>第一类是<strong>小目标、碎片化目标</strong>，典型例子是 <code>corn</code> 和 <code>onion segments</code>。这些目标本身很小，和周围食材混在一起，SAM 很难稳定地把它们分成独立实例。上游伪标签不干净，后面的 3D 聚类和文本匹配基本也很难恢复出正确目标。</p>
+<p>第二类是 <strong>2D 上已经有候选区域，但 3D 检索仍然不稳定</strong>，典型例子是 <code>sake cup</code> 和 <code>glass of water</code>。这类目标在 SAM mask 里并不是完全没有分出来，但最终仍然经常没有生成预测结果。这更像是文本 query 和正确 3D cluster 没有对上，而不只是上游分割的问题。</p>
+<p>OpenGaussian 的问题并不只在 3D 表示本身，而是同时受制于上游 mask 质量和文本检索鲁棒性，这两类问题的解决思路是不同的，需要分开看。</p>
+<h2 id="改动一：Multi-prompt-融合匹配"><a href="#改动一：Multi-prompt-融合匹配" class="headerlink" title="改动一：Multi-prompt 融合匹配"></a>改动一：Multi-prompt 融合匹配</h2><p>基于上面的观察，先做了一个轻量的尝试：把推理脚本里的单提示词匹配改成多提示词融合匹配。不只用 <code>sake cup</code> 这一个词，而是把若干近义 prompt 的文本特征先平均融合，再与 3D cluster 做 cosine 匹配。</p>
+<p>这个改动没有动训练过程，想验证的问题很简单：有些失败是不是只是因为 query wording 太脆弱？</p>
+<h3 id="结果"><a href="#结果" class="headerlink" title="结果"></a>结果</h3><table>
+<thead>
+<tr>
+<th>指标</th>
+<th align="right">Baseline</th>
+<th align="right">Multi-prompt</th>
+<th align="right">变化</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mIoU</td>
+<td align="right">0.2027</td>
+<td align="right"><strong>0.2612</strong></td>
+<td align="right"><strong>+0.0585</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#x41;&#99;&#99;&#x40;&#x30;&#46;&#x32;&#x35;">&#x41;&#99;&#99;&#x40;&#x30;&#46;&#x32;&#x35;</a></td>
+<td align="right">0.2958</td>
+<td align="right"><strong>0.3662</strong></td>
+<td align="right"><strong>+0.0704</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#65;&#x63;&#99;&#64;&#48;&#x2e;&#x35;">&#65;&#x63;&#99;&#64;&#48;&#x2e;&#x35;</a></td>
+<td align="right">0.1690</td>
+<td align="right"><strong>0.2394</strong></td>
+<td align="right"><strong>+0.0704</strong></td>
+</tr>
+</tbody></table>
+<p>具体类别的变化更值得看：</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Baseline</th>
+<th>Multi-prompt</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sake cup</code></td>
+<td>6 次中成功预测 3 次，平均 IoU 0.0002</td>
+<td><strong>6 次中成功预测 6 次，平均 IoU 0.6925</strong></td>
+</tr>
+<tr>
+<td><code>glass of water</code></td>
+<td>2 次中成功预测 0 次</td>
+<td><strong>2 次中成功预测 2 次，但 IoU 仍为 0</strong></td>
+</tr>
+<tr>
+<td><code>nori</code></td>
+<td>6 次，平均 IoU 0.7713</td>
+<td>6 次，平均 IoU 0.7713，基本无变化</td>
+</tr>
+<tr>
+<td><code>chopsticks</code></td>
+<td>7 次，平均 IoU 0.6155</td>
+<td>7 次，平均 IoU 0.6155，基本无变化</td>
+</tr>
+</tbody></table>
+<p>改动主要改善的是低检出类别。<code>sake cup</code> 在 baseline 里有一半的帧根本没有输出预测，不是 IoU 低的问题，而是系统直接放弃了这个 cluster。multi-prompt 让它在所有帧都能生成预测，平均 IoU 从 0.0002 涨到 0.6925，说明对应的 3D cluster 其实是存在的，只是 <code>sake cup</code> 这个词没有精确命中它。<code>glass of water</code> 虽然 IoU 仍然是 0，但从”完全没有预测”变成了”能够生成预测”，问题性质已经从”找不到”变成了”找到了但不够准”。</p>
+<p>这个改动本质上是 prompt-level 的 hack，能说明系统对 query wording 是敏感的，但依赖人工理解和手工补词，不够通用。</p>
+<h2 id="改动二：Stage-3-软匹配"><a href="#改动二：Stage-3-软匹配" class="headerlink" title="改动二：Stage 3 软匹配"></a>改动二：Stage 3 软匹配</h2><p>接下来把注意力转向 <code>train.py</code> 里真正影响 3D cluster 语言特征质量的部分——Stage 3 的 2D mask 到 3D cluster 关联过程。</p>
+<p>原版的关联逻辑是硬阈值匹配。对于每个 leaf cluster 在每个训练视角里，计算它与所有 SAM pseudo mask 的联合得分（IoU × 特征相似度），取最高分的那个 mask 作为匹配结果：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">b_matched = max_score &gt; <span class="number">0.2</span>   <span class="comment"># 硬阈值：低于 0.2 直接丢弃</span></span><br></pre></td></tr></table></figure>
+
+<p>丢弃之后，这个视角对该 cluster 的语言特征没有任何贡献。最终每个 cluster 的语言特征是所有匹配视角的简单等权平均。</p>
+<p>对于小目标或视角不佳的帧，3D cluster 和 2D mask 的对齐本来就不会很好，得分低于 0.2 很正常，但并不代表这个视角完全没有信息。一刀切丢弃会让这些 cluster 的语言特征只由少数几个视角决定，稳定性差。</p>
+<h3 id="改动"><a href="#改动" class="headerlink" title="改动"></a>改动</h3><p>把硬阈值改成双阈值软匹配：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">hard_match_thresh = <span class="number">0.2</span></span><br><span class="line">weak_match_thresh = <span class="number">0.05</span></span><br><span class="line">keeped_match = max_score &gt; weak_match_thresh   <span class="comment"># 弱匹配：保留但降权</span></span><br><span class="line">b_matched = max_score &gt; hard_match_thresh      <span class="comment"># 强匹配：用于统计可信匹配次数</span></span><br><span class="line">match_weight = torch.clamp(max_score, <span class="built_in">min</span>=<span class="number">0.0</span>)</span><br><span class="line">match_weight[~keeped_match] *= <span class="number">0</span></span><br></pre></td></tr></table></figure>
+
+<p>score ∈ [0.05, 0.2) 的视角不再直接丢弃，而是按 score 大小加权参与语言特征的累积。score &lt; 0.05 的才真正丢弃。最终每个 cluster 的语言特征变成加权平均，置信高的视角权重大，弱匹配视角贡献小但不为零。</p>
+<h3 id="结果-1"><a href="#结果-1" class="headerlink" title="结果"></a>结果</h3><table>
+<thead>
+<tr>
+<th>指标</th>
+<th align="right">Baseline</th>
+<th align="right">Multi-prompt</th>
+<th align="right">软匹配（train 改动）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mIoU</td>
+<td align="right">0.2027</td>
+<td align="right">0.2612</td>
+<td align="right"><strong>0.3379</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#65;&#x63;&#x63;&#64;&#x30;&#46;&#x32;&#x35;">&#65;&#x63;&#x63;&#64;&#x30;&#46;&#x32;&#x35;</a></td>
+<td align="right">0.2958</td>
+<td align="right">0.3662</td>
+<td align="right"><strong>0.4648</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#65;&#x63;&#x63;&#x40;&#x30;&#46;&#x35;">&#65;&#x63;&#x63;&#x40;&#x30;&#46;&#x35;</a></td>
+<td align="right">0.1690</td>
+<td align="right">0.2394</td>
+<td align="right"><strong>0.3803</strong></td>
+</tr>
+</tbody></table>
+<p>mIoU 从 0.2027 涨到 0.3379，比 multi-prompt 的 0.2612 还高出不少。render 端用的是和 baseline 一样的原版，两个改动是完全独立的。</p>
+<p>受益最明显的是那些在 baseline 里对齐得分偏低、容易被硬阈值过滤掉的目标，比如 <code>sake cup</code>、<code>bowl</code>、<code>napkin</code>。软匹配让它们在更多视角里积累了有效的语言特征，检索时更容易被正确命中。</p>
+<p>得分在 0.05~0.2 之间的视角并不是”匹配完全错了”，只是对齐不够完美，仍然提供了一定的正确信号。原版直接丢掉这部分，等于在信号本来就稀疏的 cluster 上进一步加大了噪声。让得分本身充当权重，在信号稀疏的情况下是更合理的策略。</p>
+<h2 id="完整消融汇总"><a href="#完整消融汇总" class="headerlink" title="完整消融汇总"></a>完整消融汇总</h2><table>
+<thead>
+<tr>
+<th>版本</th>
+<th>train</th>
+<th>render</th>
+<th align="right">mIoU</th>
+<th align="right"><a href="mailto:&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#x32;&#53;">&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#x32;&#53;</a></th>
+<th align="right"><a href="mailto:&#x41;&#x63;&#x63;&#64;&#x30;&#46;&#53;">&#x41;&#x63;&#x63;&#64;&#x30;&#46;&#53;</a></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Baseline</td>
+<td>原版</td>
+<td>原版</td>
+<td align="right">0.2027</td>
+<td align="right">0.2958</td>
+<td align="right">0.1690</td>
+</tr>
+<tr>
+<td>Multi-prompt</td>
+<td>原版</td>
+<td>多提示词融合</td>
+<td align="right">0.2612</td>
+<td align="right">0.3662</td>
+<td align="right">0.2394</td>
+</tr>
+<tr>
+<td>软匹配</td>
+<td>软匹配</td>
+<td>原版</td>
+<td align="right"><strong>0.3379</strong></td>
+<td align="right"><strong>0.4648</strong></td>
+<td align="right"><strong>0.3803</strong></td>
+</tr>
+</tbody></table>
+<p>两个改动相互独立，分别作用在推理端和训练端。两者同时开启的组合效果尚未测试。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>Baseline 的问题同时来自两个方向：推理端的文本 query 对措辞敏感，训练端的 2D-3D 关联因为硬阈值丢掉了太多弱但有效的匹配信息。multi-prompt 是在推理端打补丁，软匹配是在训练端改机制，后者的提升幅度更大也更根本。</p>
+<p>还有一类问题这两个改动都没有解决：<code>corn</code>、<code>onion segments</code> 这类小目标，上游 SAM 就已经分不好，后面怎么改匹配逻辑都很难救回来。伪标签质量和小目标处理是后续值得单独看的方向。</p>
 ]]></content>
       <categories>
-        <category>工具</category>
+        <category>散记</category>
       </categories>
       <tags>
-        <tag>linux</tag>
-        <tag>tmux</tag>
+        <tag>3DGS</tag>
+        <tag>open vocabulary</tag>
+        <tag>具身感知</tag>
       </tags>
   </entry>
   <entry>

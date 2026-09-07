@@ -1,0 +1,458 @@
+<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>【论文笔记】OpenGaussian | iglues</title><meta name="author" content="Faunney"><meta name="copyright" content="Faunney"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="论文是做什么的OpenGaussian（NeurIPS 2024）解决的问题是：给定一个 3D 场景，能不能用自然语言查询找到对应的物体，并精确定位到 3D 点级别。 这个问题以前也有人做，但大多数方法是在 2D 像素级别做语义理解，3D 只是顺带的。OpenGaussian 的出发点是：直接给每个 3D Gaussian 关联一个语义特征，这样查询结果天然就是 3D 点级别的，不需要从 2D 反">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【论文笔记】OpenGaussian">
+<meta property="og:url" content="http://example.com/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/index.html">
+<meta property="og:site_name" content="iglues">
+<meta property="og:description" content="论文是做什么的OpenGaussian（NeurIPS 2024）解决的问题是：给定一个 3D 场景，能不能用自然语言查询找到对应的物体，并精确定位到 3D 点级别。 这个问题以前也有人做，但大多数方法是在 2D 像素级别做语义理解，3D 只是顺带的。OpenGaussian 的出发点是：直接给每个 3D Gaussian 关联一个语义特征，这样查询结果天然就是 3D 点级别的，不需要从 2D 反">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/img/roller%20coaster.jpg">
+<meta property="article:published_time" content="2025-05-14T06:54:49.000Z">
+<meta property="article:modified_time" content="2026-04-05T15:41:48.523Z">
+<meta property="article:author" content="Faunney">
+<meta property="article:tag" content="3DGS">
+<meta property="article:tag" content="open vocabulary">
+<meta property="article:tag" content="具身感知">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/img/roller%20coaster.jpg"><link rel="shortcut icon" href="/img/cat2.jpg"><link rel="canonical" href="http://example.com/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=4.13.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":5,"unescape":false,"languages":{"hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":500},
+  copy: {
+    success: 'Copy Successful',
+    error: 'Copy Error',
+    noSupport: 'Browser Not Supported'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: 'Just now',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.11.1/dist/infinitegrid.min.js',
+    buttonText: 'Load More'
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '【论文笔记】OpenGaussian',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2026-04-05 23:41:48'
+}</script><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 6.3.0"></head><body><div id="web_bg"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/img/badboy.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">7</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">15</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">4</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/img/roller%20coaster.jpg')"><nav id="nav"><span id="blog-info"><a href="/" title="iglues"><span class="site-name">iglues</span></a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search" href="javascript:void(0);"><i class="fas fa-search fa-fw"></i><span> Search</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">【论文笔记】OpenGaussian</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2025-05-14T06:54:49.000Z" title="Created 2025-05-14 14:54:49">2025-05-14</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2026-04-05T15:41:48.523Z" title="Updated 2026-04-05 23:41:48">2026-04-05</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%95%A3%E8%AE%B0/">散记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">Word Count:</span><span class="word-count">2.5k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">Reading Time:</span><span>8mins</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="【论文笔记】OpenGaussian"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h2 id="论文是做什么的"><a href="#论文是做什么的" class="headerlink" title="论文是做什么的"></a>论文是做什么的</h2><p>OpenGaussian（NeurIPS 2024）解决的问题是：给定一个 3D 场景，能不能用自然语言查询找到对应的物体，并精确定位到 3D 点级别。</p>
+<p>这个问题以前也有人做，但大多数方法是在 2D 像素级别做语义理解，3D 只是顺带的。OpenGaussian 的出发点是：直接给每个 3D Gaussian 关联一个语义特征，这样查询结果天然就是 3D 点级别的，不需要从 2D 反投影。</p>
+<p>场景表示用的是 3D Gaussian Splatting（3DGS）。3DGS 把场景表示成一堆椭球形的高斯球，每个球有位置、颜色、透明度等属性，渲染速度很快。OpenGaussian 在每个高斯球上额外加了一个实例特征向量，用来区分不同物体。</p>
+<h2 id="方法：四个阶段"><a href="#方法：四个阶段" class="headerlink" title="方法：四个阶段"></a>方法：四个阶段</h2><p>整个训练流程分四个阶段，逻辑上是递进的。</p>
+<p><strong>Stage 0：标准 3DGS 预训练。</strong> 先把 RGB 渲染质量训好，30000 步，不涉及语义特征。</p>
+<p><strong>Stage 1：连续实例特征学习。</strong> 开始给每个高斯球训练 6 维实例特征。监督信号来自 SAM 分割出的 2D mask——同一个 mask 内的像素特征应该相近（cohesion loss），不同 mask 之间的特征应该尽量远离（separation loss）。这一阶段训出来的特征是连续的，还没有离散化。</p>
+<p><strong>Stage 2：两级 Codebook 离散化。</strong> 把连续特征量化成离散的 cluster ID。先做粗粒度聚类（k1 个 root cluster），再在每个 root 内部做细粒度聚类（k2 个 leaf cluster）。最终每个高斯球有一个 leaf cluster ID，空间上相近且特征相似的点会被分到同一个 cluster。</p>
+<p><strong>Stage 3：2D 语言特征关联。</strong> 训练结束后，把每个 3D leaf cluster 和 2D SAM mask 做关联，把 mask 对应的 CLIP 语言特征聚合进来。推理时，把文本编码成 CLIP 特征，和每个 cluster 的语言特征做 cosine similarity，找最相似的 cluster 渲染出来，就是查询结果。</p>
+<p>Stage 3 是一个 training-free 的后处理步骤，不影响前面的 3DGS 参数，但对最终检索质量影响很大。</p>
+<h2 id="Baseline-结果"><a href="#Baseline-结果" class="headerlink" title="Baseline 结果"></a>Baseline 结果</h2><p>在 <code>ramen</code> 场景上跑 OpenGaussian 的文本选物体流程，整体结果是：<code>mIoU = 0.2027</code>，<code>Acc@0.25 = 0.2958</code>，<code>Acc@0.5 = 0.1690</code>。只看总分很难判断问题出在哪里，把结果按 query 拆开统计：</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th align="right">出现次数</th>
+<th align="right">成功预测次数</th>
+<th align="right">缺预测次数</th>
+<th align="right">成功率</th>
+<th align="right">成功样本平均 IoU</th>
+<th align="right">最佳 IoU</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>bowl</td>
+<td align="right">5</td>
+<td align="right">2</td>
+<td align="right">3</td>
+<td align="right">0.400</td>
+<td align="right">0.2272</td>
+<td align="right">0.2745</td>
+</tr>
+<tr>
+<td>chopsticks</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.6155</td>
+<td align="right">0.8139</td>
+</tr>
+<tr>
+<td>corn</td>
+<td align="right">5</td>
+<td align="right">5</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0004</td>
+<td align="right">0.0020</td>
+</tr>
+<tr>
+<td>egg</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.3927</td>
+<td align="right">0.4855</td>
+</tr>
+<tr>
+<td>glass of water</td>
+<td align="right">2</td>
+<td align="right">0</td>
+<td align="right">2</td>
+<td align="right">0.000</td>
+<td align="right">0.0000</td>
+<td align="right">0.0000</td>
+</tr>
+<tr>
+<td>hand</td>
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0000</td>
+<td align="right">0.0000</td>
+</tr>
+<tr>
+<td>kamaboko</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0723</td>
+<td align="right">0.0839</td>
+</tr>
+<tr>
+<td>napkin</td>
+<td align="right">5</td>
+<td align="right">3</td>
+<td align="right">2</td>
+<td align="right">0.600</td>
+<td align="right">0.1835</td>
+<td align="right">0.5506</td>
+</tr>
+<tr>
+<td>nori</td>
+<td align="right">6</td>
+<td align="right">6</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.7713</td>
+<td align="right">0.8372</td>
+</tr>
+<tr>
+<td>onion segments</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0003</td>
+<td align="right">0.0017</td>
+</tr>
+<tr>
+<td>plate</td>
+<td align="right">4</td>
+<td align="right">0</td>
+<td align="right">4</td>
+<td align="right">0.000</td>
+<td align="right">0.0000</td>
+<td align="right">0.0000</td>
+</tr>
+<tr>
+<td>sake cup</td>
+<td align="right">6</td>
+<td align="right">3</td>
+<td align="right">3</td>
+<td align="right">0.500</td>
+<td align="right">0.0002</td>
+<td align="right">0.0006</td>
+</tr>
+<tr>
+<td>spoon</td>
+<td align="right">2</td>
+<td align="right">2</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.0185</td>
+<td align="right">0.0370</td>
+</tr>
+<tr>
+<td>wavy noodles</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td align="right">0</td>
+<td align="right">1.000</td>
+<td align="right">0.1650</td>
+<td align="right">0.2394</td>
+</tr>
+</tbody></table>
+<p>两个比较明显的现象：第一，有些目标能稳定生成预测且 IoU 较高，例如 <code>nori</code> 和 <code>chopsticks</code>。第二，有些目标虽然能生成预测但 IoU 很差，例如 <code>corn</code> 和 <code>onion segments</code>；还有一些目标经常无法生成预测，例如 <code>glass of water</code>、<code>plate</code> 和 <code>sake cup</code>。</p>
+<h2 id="失败模式"><a href="#失败模式" class="headerlink" title="失败模式"></a>失败模式</h2><p>结合原图、SAM mask 和最终的 <code>silhouette</code> 结果，失败大致分成两类。</p>
+<p>第一类是<strong>小目标、碎片化目标</strong>，典型例子是 <code>corn</code> 和 <code>onion segments</code>。这些目标本身很小，和周围食材混在一起，SAM 很难稳定地把它们分成独立实例。上游伪标签不干净，后面的 3D 聚类和文本匹配基本也很难恢复出正确目标。</p>
+<p>第二类是 <strong>2D 上已经有候选区域，但 3D 检索仍然不稳定</strong>，典型例子是 <code>sake cup</code> 和 <code>glass of water</code>。这类目标在 SAM mask 里并不是完全没有分出来，但最终仍然经常没有生成预测结果。这更像是文本 query 和正确 3D cluster 没有对上，而不只是上游分割的问题。</p>
+<p>OpenGaussian 的问题并不只在 3D 表示本身，而是同时受制于上游 mask 质量和文本检索鲁棒性，这两类问题的解决思路是不同的，需要分开看。</p>
+<h2 id="改动一：Multi-prompt-融合匹配"><a href="#改动一：Multi-prompt-融合匹配" class="headerlink" title="改动一：Multi-prompt 融合匹配"></a>改动一：Multi-prompt 融合匹配</h2><p>基于上面的观察，先做了一个轻量的尝试：把推理脚本里的单提示词匹配改成多提示词融合匹配。不只用 <code>sake cup</code> 这一个词，而是把若干近义 prompt 的文本特征先平均融合，再与 3D cluster 做 cosine 匹配。</p>
+<p>这个改动没有动训练过程，想验证的问题很简单：有些失败是不是只是因为 query wording 太脆弱？</p>
+<h3 id="结果"><a href="#结果" class="headerlink" title="结果"></a>结果</h3><table>
+<thead>
+<tr>
+<th>指标</th>
+<th align="right">Baseline</th>
+<th align="right">Multi-prompt</th>
+<th align="right">变化</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mIoU</td>
+<td align="right">0.2027</td>
+<td align="right"><strong>0.2612</strong></td>
+<td align="right"><strong>+0.0585</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#x41;&#99;&#99;&#x40;&#x30;&#46;&#x32;&#x35;">&#x41;&#99;&#99;&#x40;&#x30;&#46;&#x32;&#x35;</a></td>
+<td align="right">0.2958</td>
+<td align="right"><strong>0.3662</strong></td>
+<td align="right"><strong>+0.0704</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#65;&#x63;&#99;&#64;&#48;&#x2e;&#x35;">&#65;&#x63;&#99;&#64;&#48;&#x2e;&#x35;</a></td>
+<td align="right">0.1690</td>
+<td align="right"><strong>0.2394</strong></td>
+<td align="right"><strong>+0.0704</strong></td>
+</tr>
+</tbody></table>
+<p>具体类别的变化更值得看：</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Baseline</th>
+<th>Multi-prompt</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sake cup</code></td>
+<td>6 次中成功预测 3 次，平均 IoU 0.0002</td>
+<td><strong>6 次中成功预测 6 次，平均 IoU 0.6925</strong></td>
+</tr>
+<tr>
+<td><code>glass of water</code></td>
+<td>2 次中成功预测 0 次</td>
+<td><strong>2 次中成功预测 2 次，但 IoU 仍为 0</strong></td>
+</tr>
+<tr>
+<td><code>nori</code></td>
+<td>6 次，平均 IoU 0.7713</td>
+<td>6 次，平均 IoU 0.7713，基本无变化</td>
+</tr>
+<tr>
+<td><code>chopsticks</code></td>
+<td>7 次，平均 IoU 0.6155</td>
+<td>7 次，平均 IoU 0.6155，基本无变化</td>
+</tr>
+</tbody></table>
+<p>改动主要改善的是低检出类别。<code>sake cup</code> 在 baseline 里有一半的帧根本没有输出预测，不是 IoU 低的问题，而是系统直接放弃了这个 cluster。multi-prompt 让它在所有帧都能生成预测，平均 IoU 从 0.0002 涨到 0.6925，说明对应的 3D cluster 其实是存在的，只是 <code>sake cup</code> 这个词没有精确命中它。<code>glass of water</code> 虽然 IoU 仍然是 0，但从”完全没有预测”变成了”能够生成预测”，问题性质已经从”找不到”变成了”找到了但不够准”。</p>
+<p>这个改动本质上是 prompt-level 的 hack，能说明系统对 query wording 是敏感的，但依赖人工理解和手工补词，不够通用。</p>
+<h2 id="改动二：Stage-3-软匹配"><a href="#改动二：Stage-3-软匹配" class="headerlink" title="改动二：Stage 3 软匹配"></a>改动二：Stage 3 软匹配</h2><p>接下来把注意力转向 <code>train.py</code> 里真正影响 3D cluster 语言特征质量的部分——Stage 3 的 2D mask 到 3D cluster 关联过程。</p>
+<p>原版的关联逻辑是硬阈值匹配。对于每个 leaf cluster 在每个训练视角里，计算它与所有 SAM pseudo mask 的联合得分（IoU × 特征相似度），取最高分的那个 mask 作为匹配结果：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">b_matched = max_score &gt; <span class="number">0.2</span>   <span class="comment"># 硬阈值：低于 0.2 直接丢弃</span></span><br></pre></td></tr></table></figure>
+
+<p>丢弃之后，这个视角对该 cluster 的语言特征没有任何贡献。最终每个 cluster 的语言特征是所有匹配视角的简单等权平均。</p>
+<p>对于小目标或视角不佳的帧，3D cluster 和 2D mask 的对齐本来就不会很好，得分低于 0.2 很正常，但并不代表这个视角完全没有信息。一刀切丢弃会让这些 cluster 的语言特征只由少数几个视角决定，稳定性差。</p>
+<h3 id="改动"><a href="#改动" class="headerlink" title="改动"></a>改动</h3><p>把硬阈值改成双阈值软匹配：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">hard_match_thresh = <span class="number">0.2</span></span><br><span class="line">weak_match_thresh = <span class="number">0.05</span></span><br><span class="line">keeped_match = max_score &gt; weak_match_thresh   <span class="comment"># 弱匹配：保留但降权</span></span><br><span class="line">b_matched = max_score &gt; hard_match_thresh      <span class="comment"># 强匹配：用于统计可信匹配次数</span></span><br><span class="line">match_weight = torch.clamp(max_score, <span class="built_in">min</span>=<span class="number">0.0</span>)</span><br><span class="line">match_weight[~keeped_match] *= <span class="number">0</span></span><br></pre></td></tr></table></figure>
+
+<p>score ∈ [0.05, 0.2) 的视角不再直接丢弃，而是按 score 大小加权参与语言特征的累积。score &lt; 0.05 的才真正丢弃。最终每个 cluster 的语言特征变成加权平均，置信高的视角权重大，弱匹配视角贡献小但不为零。</p>
+<h3 id="结果-1"><a href="#结果-1" class="headerlink" title="结果"></a>结果</h3><table>
+<thead>
+<tr>
+<th>指标</th>
+<th align="right">Baseline</th>
+<th align="right">Multi-prompt</th>
+<th align="right">软匹配（train 改动）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mIoU</td>
+<td align="right">0.2027</td>
+<td align="right">0.2612</td>
+<td align="right"><strong>0.3379</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#65;&#x63;&#x63;&#64;&#x30;&#46;&#x32;&#x35;">&#65;&#x63;&#x63;&#64;&#x30;&#46;&#x32;&#x35;</a></td>
+<td align="right">0.2958</td>
+<td align="right">0.3662</td>
+<td align="right"><strong>0.4648</strong></td>
+</tr>
+<tr>
+<td><a href="mailto:&#65;&#x63;&#x63;&#x40;&#x30;&#46;&#x35;">&#65;&#x63;&#x63;&#x40;&#x30;&#46;&#x35;</a></td>
+<td align="right">0.1690</td>
+<td align="right">0.2394</td>
+<td align="right"><strong>0.3803</strong></td>
+</tr>
+</tbody></table>
+<p>mIoU 从 0.2027 涨到 0.3379，比 multi-prompt 的 0.2612 还高出不少。render 端用的是和 baseline 一样的原版，两个改动是完全独立的。</p>
+<p>受益最明显的是那些在 baseline 里对齐得分偏低、容易被硬阈值过滤掉的目标，比如 <code>sake cup</code>、<code>bowl</code>、<code>napkin</code>。软匹配让它们在更多视角里积累了有效的语言特征，检索时更容易被正确命中。</p>
+<p>得分在 0.05~0.2 之间的视角并不是”匹配完全错了”，只是对齐不够完美，仍然提供了一定的正确信号。原版直接丢掉这部分，等于在信号本来就稀疏的 cluster 上进一步加大了噪声。让得分本身充当权重，在信号稀疏的情况下是更合理的策略。</p>
+<h2 id="完整消融汇总"><a href="#完整消融汇总" class="headerlink" title="完整消融汇总"></a>完整消融汇总</h2><table>
+<thead>
+<tr>
+<th>版本</th>
+<th>train</th>
+<th>render</th>
+<th align="right">mIoU</th>
+<th align="right"><a href="mailto:&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#x32;&#53;">&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#x32;&#53;</a></th>
+<th align="right"><a href="mailto:&#x41;&#x63;&#x63;&#64;&#x30;&#46;&#53;">&#x41;&#x63;&#x63;&#64;&#x30;&#46;&#53;</a></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Baseline</td>
+<td>原版</td>
+<td>原版</td>
+<td align="right">0.2027</td>
+<td align="right">0.2958</td>
+<td align="right">0.1690</td>
+</tr>
+<tr>
+<td>Multi-prompt</td>
+<td>原版</td>
+<td>多提示词融合</td>
+<td align="right">0.2612</td>
+<td align="right">0.3662</td>
+<td align="right">0.2394</td>
+</tr>
+<tr>
+<td>软匹配</td>
+<td>软匹配</td>
+<td>原版</td>
+<td align="right"><strong>0.3379</strong></td>
+<td align="right"><strong>0.4648</strong></td>
+<td align="right"><strong>0.3803</strong></td>
+</tr>
+</tbody></table>
+<p>两个改动相互独立，分别作用在推理端和训练端。两者同时开启的组合效果尚未测试。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>Baseline 的问题同时来自两个方向：推理端的文本 query 对措辞敏感，训练端的 2D-3D 关联因为硬阈值丢掉了太多弱但有效的匹配信息。multi-prompt 是在推理端打补丁，软匹配是在训练端改机制，后者的提升幅度更大也更根本。</p>
+<p>还有一类问题这两个改动都没有解决：<code>corn</code>、<code>onion segments</code> 这类小目标，上游 SAM 就已经分不好，后面怎么改匹配逻辑都很难救回来。伪标签质量和小目标处理是后续值得单独看的方向。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>Author: </span><span class="post-copyright-info"><a href="http://example.com">Faunney</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>Link: </span><span class="post-copyright-info"><a href="http://example.com/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/">http://example.com/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>Copyright Notice: </span><span class="post-copyright-info">All articles in this blog are licensed under <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> unless stating additionally.</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/3DGS/">3DGS</a><a class="post-meta__tags" href="/tags/open-vocabulary/">open vocabulary</a><a class="post-meta__tags" href="/tags/%E5%85%B7%E8%BA%AB%E6%84%9F%E7%9F%A5/">具身感知</a></div><div class="post_share"><div class="social-share" data-image="/img/roller%20coaster.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/" title="【散记】PE考核探索报告"><img class="cover" src="/img/roller%20coaster.jpg" onerror="onerror=null;src='/img/404.jpg'" alt="cover of previous post"><div class="pagination-info"><div class="label">Previous</div><div class="prev_info">【散记】PE考核探索报告</div></div></a></div><div class="next-post pull-right"><a href="/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/" title="【论文笔记】STAMP方法论精读"><img class="cover" src="/img/roller%20coaster.jpg" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">Next</div><div class="next_info">【论文笔记】STAMP方法论精读</div></div></a></div></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/img/badboy.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">Faunney</div><div class="author-info__description"></div></div><div class="card-info-data site-data is-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">7</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">15</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">4</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Faunney"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/Faunney" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:faunney@icloud.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #24292e;"></i></a><a class="social-icon" href="/img/Weixin.jpg" target="_blank" title="Weixin"><i class="fa-brands fa-weixin" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">感谢访问～欢迎交流</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AE%BA%E6%96%87%E6%98%AF%E5%81%9A%E4%BB%80%E4%B9%88%E7%9A%84"><span class="toc-number">1.</span> <span class="toc-text">论文是做什么的</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B9%E6%B3%95%EF%BC%9A%E5%9B%9B%E4%B8%AA%E9%98%B6%E6%AE%B5"><span class="toc-number">2.</span> <span class="toc-text">方法：四个阶段</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Baseline-%E7%BB%93%E6%9E%9C"><span class="toc-number">3.</span> <span class="toc-text">Baseline 结果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A4%B1%E8%B4%A5%E6%A8%A1%E5%BC%8F"><span class="toc-number">4.</span> <span class="toc-text">失败模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%94%B9%E5%8A%A8%E4%B8%80%EF%BC%9AMulti-prompt-%E8%9E%8D%E5%90%88%E5%8C%B9%E9%85%8D"><span class="toc-number">5.</span> <span class="toc-text">改动一：Multi-prompt 融合匹配</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%93%E6%9E%9C"><span class="toc-number">5.1.</span> <span class="toc-text">结果</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%94%B9%E5%8A%A8%E4%BA%8C%EF%BC%9AStage-3-%E8%BD%AF%E5%8C%B9%E9%85%8D"><span class="toc-number">6.</span> <span class="toc-text">改动二：Stage 3 软匹配</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%94%B9%E5%8A%A8"><span class="toc-number">6.1.</span> <span class="toc-text">改动</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%93%E6%9E%9C-1"><span class="toc-number">6.2.</span> <span class="toc-text">结果</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B6%88%E8%9E%8D%E6%B1%87%E6%80%BB"><span class="toc-number">7.</span> <span class="toc-text">完整消融汇总</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">8.</span> <span class="toc-text">总结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Post</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/" title="【学习笔记】VTLA相关概念总结"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【学习笔记】VTLA相关概念总结"/></a><div class="content"><a class="title" href="/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/" title="【学习笔记】VTLA相关概念总结">【学习笔记】VTLA相关概念总结</a><time datetime="2026-09-01T12:44:20.000Z" title="Created 2026-09-01 20:44:20">2026-09-01</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/" title="【散记】PE考核探索报告"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【散记】PE考核探索报告"/></a><div class="content"><a class="title" href="/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/" title="【散记】PE考核探索报告">【散记】PE考核探索报告</a><time datetime="2025-05-14T06:54:49.000Z" title="Created 2025-05-14 14:54:49">2025-05-14</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/" title="【论文笔记】OpenGaussian"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【论文笔记】OpenGaussian"/></a><div class="content"><a class="title" href="/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/" title="【论文笔记】OpenGaussian">【论文笔记】OpenGaussian</a><time datetime="2025-05-14T06:54:49.000Z" title="Created 2025-05-14 14:54:49">2025-05-14</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/" title="【论文笔记】STAMP方法论精读"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【论文笔记】STAMP方法论精读"/></a><div class="content"><a class="title" href="/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/" title="【论文笔记】STAMP方法论精读">【论文笔记】STAMP方法论精读</a><time datetime="2025-04-23T02:09:34.000Z" title="Created 2025-04-23 10:09:34">2025-04-23</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" title="【工具】tmux基本使用"><img src="/img/roller%20coaster.jpg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="【工具】tmux基本使用"/></a><div class="content"><a class="title" href="/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" title="【工具】tmux基本使用">【工具】tmux基本使用</a><time datetime="2025-04-14T08:58:15.000Z" title="Created 2025-04-14 16:58:15">2025-04-14</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2024.03 - 2026 By Faunney</div><div class="framework-info"><span>Framework </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>Theme </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Read Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light And Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Setting"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table Of Contents"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="Back To Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=4.13.0"></script><script src="/js/main.js?v=4.13.0"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.umd.min.js"></script><div class="js-pjax"></div><canvas class="fireworks" mobile="false"></canvas><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/fireworks.min.js"></script><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/dist/activate-power-mode.min.js"></script><script>POWERMODE.colorful = true;
+POWERMODE.shake = true;
+POWERMODE.mobile = true;
+document.body.addEventListener('input', POWERMODE);
+</script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">Search</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="is-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  Loading the Database</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="Search for Posts" type="text"/></div></div><hr/><div id="local-search-results"></div><div id="local-search-stats-wrap"></div></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=4.13.0"></script></div></div></body></html>
