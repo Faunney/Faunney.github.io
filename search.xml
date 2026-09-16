@@ -1,162 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>【学习笔记】VTLA相关概念总结</title>
-    <url>/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/</url>
-    <content><![CDATA[<h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><ul>
-<li><p>接触密集型操作（Contact-Rich Manipulation）为什么视觉不够用</p>
-<ul>
-<li>物体可能被手遮挡</li>
-<li>需要判断有没有对齐、力度够不够、是否打滑</li>
-</ul>
-</li>
-<li><p>触觉能提供的信息类型</p>
-<ul>
-<li>接触力&#x2F;摩擦&#x2F;滑动&#x2F;接触状态转移</li>
-</ul>
-</li>
-</ul>
-<h2 id="硬件基础"><a href="#硬件基础" class="headerlink" title="硬件基础"></a>硬件基础</h2><ul>
-<li><p>视觉触觉传感器</p>
-<ul>
-<li>GelSight&#x2F;DIGIT 等，原理：形变→内置摄像头成像</li>
-<li>传感器内部有一层软胶皮肤，接触变形后由内置摄像头拍照，再通过图像处理&#x2F;深度学习还原出接触形状、压力分布甚至滑动信息。</li>
-<li>本质上是把触觉问题转换成了图像问题，所以能直接复用视觉模型的架构（这也是为什么很多论文能把触觉塞进 VLA&#x2F;世界模型里）</li>
-</ul>
-</li>
-<li><p>力&#x2F;压力传感器类（直接输出物理量，非图像）</p>
-</li>
-<li><p>传感器异构性问题（型号&#x2F;分辨率&#x2F;安装位置不同导致的迁移难题）</p>
-</li>
-</ul>
-<h2 id="模型范式"><a href="#模型范式" class="headerlink" title="模型范式"></a>模型范式</h2><ul>
-<li><p>VLA（Vision-Language-Action）</p>
-<ul>
-<li>基本框架：观测 (O &#x3D; V + L) -&gt; 动作 (A)</li>
-<li>输入为</li>
-<li>输出为机器人动作序列（关节角度&#x2F;末端为姿等）</li>
-</ul>
-</li>
-<li><p>VTLA（Vision-Tactile-Language-Action）</p>
-<ul>
-<li>VLA基础上的扩展，加入tactile sensors</li>
-<li>问题：触觉信号怎么编码、怎么和VL对齐、怎么融合进动作生成</li>
-</ul>
-</li>
-<li><p>World Model</p>
-<ul>
-<li>路线：预测”下一步会怎样”，用于生成数据&#x2F;规划&#x2F;闭环校正</li>
-<li>O_t + A_t -&gt; O_t+1</li>
-<li>世界模型可以做：</li>
-<li>① 数据增强&#x2F;生成虚拟 rollout 训练数据；</li>
-<li>② 做 planning（在脑内试错，选最优动作再执行）；</li>
-<li>③ 做闭环校正（预测和真实触觉对不上时立刻纠偏）</li>
-</ul>
-</li>
-</ul>
-<h2 id="表征与编码"><a href="#表征与编码" class="headerlink" title="表征与编码"></a>表征与编码</h2><ul>
-<li><p>Encoder 的含义<br>  特征提取器（一段神经网络），区别于物理编码器（位移&#x2F;角度编码器）</p>
-</li>
-<li><p>特征向量&#x2F;embedding 的产生方式</p>
-<ul>
-<li>离散的L信息（通过tokenizer划分成token）通过embedding table（形状为[词表大小, 向量维度]的矩阵）方式获得初始向量（查找token对应的一行）</li>
-<li>连续的VT信息均通过特定训练的一段神经网络（encoder）得到特征向量（这个特征空间可以是语义空间（类似CLIP embedding做对齐），也可以是单独适配该encoder的空间）</li>
-<li>连续信号靠网络计算 vs 离散 token 查 embedding table</li>
-</ul>
-</li>
-<li><p>多模态对齐的本质：不同模态最终都变成同一空间下的向量&#x2F;token</p>
-<br></li>
-</ul>
-<h2 id="模态融合方式"><a href="#模态融合方式" class="headerlink" title="模态融合方式"></a>模态融合方式</h2><ul>
-<li><p>早期融合 vs 晚期融合</p>
-<ul>
-<li>早期融合：不同模态信息经过modality-specific encoder后，拼接一起进VLA backbone</li>
-<li>晚期融合：不同模态信息经过modality-specific encoder后，通过cross-attention等机制进行信息融合</li>
-<li>目前很多VLA模型中VL信息采用early fusion，state信息采用conditioning(融合进入head部分，而非late fusion)</li>
-</ul>
-</li>
-<li><p>Cross-attention &#x2F; cross-view attention</p>
-<ul>
-<li>若采用晚期融合，可以新增一个触觉编码器 + 新增的 cross-attention 层。</li>
-<li>例如触觉token做Query，视觉token做Key&#x2F;Value</li>
-</ul>
-</li>
-<li><p>Contact-aware fusion</p>
-<ul>
-<li>根据接触状态动态调整融合权重（包括VTL等信息的权重 &amp; 每种信息中某特定部分的权重，比如图像中的某部分）</li>
-</ul>
-</li>
-</ul>
-<h2 id="训练范式"><a href="#训练范式" class="headerlink" title="训练范式"></a>训练范式</h2><ul>
-<li><p>自监督预训练（对比学习、掩码重建——针对 encoder，无需动作标签）</p>
-<ul>
-<li>有动作标注的数据很稀缺，但无标签的数据很容易采集。因此在训练encoder时，往往可以先用无标签的数据，使之学会”怎么把原始信号压缩成有语义的特征向量”，后续可以冻结或微调encoder</li>
-<li>常见方法：</li>
-<li>对比学习（比如让同一时刻拍到的触觉图和视觉图的向量距离拉近，不同时刻&#x2F;不同物体的推远，类似 CLIP 的思路）；</li>
-<li>掩码重建（遮住触觉图的一部分，让模型学着补全，类似 MAE）。这两种都不需要动作标签。</li>
-</ul>
-</li>
-<li><p>模仿学习&#x2F;行为克隆（针对策略本身，需要示教数据里的动作标签）</p>
-</li>
-<li><p>微调 vs 全量微调 vs LoRA（后训练阶段的几种方式及各自代价）</p>
-<ul>
-<li>微调为“后训练”中的一种，在VLA中是指拿成熟的VLM模型，在自己的小规模机器人数据上训练，进而适应具体任务。</li>
-<li>全量微调是指，模型中所有参数都参与更新。效果通常最好但显存&#x2F;算力开销大，而且容易”灾难性遗忘”（把预训练学到的通用知识冲掉）</li>
-<li>LoRA：冻结原始权重，只在部分层（通常是注意力层）旁边插入两个小的低秩矩阵，只训练这两个小矩阵，参数量可能只有原模型的 0.1%~1%</li>
-</ul>
-</li>
-</ul>
-<h2 id="动作生成机制"><a href="#动作生成机制" class="headerlink" title="动作生成机制"></a>动作生成机制</h2><ul>
-<li>Diffusion Policy<ul>
-<li>用去噪过程建模多峰动作分布</li>
-<li>Policy即策略，用于 VLA 的 Diffusion model </li>
-<li>很多任务里”正确动作”不是唯一的，比如绕开障碍物可以往左也可以往右，这叫动作分布是多峰的（multimodal）。如果用普通回归去拟合多峰分布，模型会学出”左右取平均”这种谁都不对的动作。</li>
-<li>扩散模型天生擅长建模复杂&#x2F;多峰分布（它本质是在学一个概率分布，而不是学一个确定的函数）。所以 Diffusion Policy 就是：把”给定观测，生成一段动作”这件事，做成”以观测为条件，从噪声去噪出动作序列”的扩散过程。</li>
-<li>V + L + State（state 也可能在 head 中加入） -&gt; VLA backbone -&gt; head -&gt; Diffusion action head -&gt; Action chunk</li>
-</ul>
-</li>
-<li>Action Chunking（一次生成一段动作，receding horizon 执行）</li>
-</ul>
-<h2 id="控制与反馈"><a href="#控制与反馈" class="headerlink" title="控制与反馈"></a>控制与反馈</h2><ul>
-<li><p>开环执行的盲区（action chunk 执行期间为何”看不见”新变化）</p>
-<ul>
-<li>如果一次生成一个action chunk，执行完这一整段才重新看新观测”——这一整段执行期间，模型对新的触觉变化是”看不见&#x2F;不响应”的，是开环执行</li>
-</ul>
-</li>
-<li><p>高频反射式校正（低层快速闭环 vs 高层慢速规划的分工）</p>
-<ul>
-<li>可单独设计一个小模块，比较”世界模型&#x2F;上一步预测的触觉信号”和”传感器实际测到的触觉信号”，如果有偏差（比如实际接触力比预测的大很多，说明可能要打滑了），就在当前正在执行的动作 chunk 上做一个小幅度的实时修正，而不必等下一次完整的大模型推理。</li>
-<li>大模型的完整推理循环像是”深思熟虑做计划”，而这个高频反射校正更像是人被烫到时的脊髓反射——不用等大脑（VLA）反应过来，先做个快速的局部纠正动作。</li>
-</ul>
-</li>
-</ul>
-<h2 id="数据处理"><a href="#数据处理" class="headerlink" title="数据处理"></a>数据处理</h2><ul>
-<li><p>遥操作采集及其成本问题</p>
-<ul>
-<li>遥操作（teleoperation）可以粗暴理解为遥控机器人工作来采集数据</li>
-</ul>
-</li>
-<li><p>Robot-free &#x2F; 免机器人采集方案</p>
-<ul>
-<li>新兴方法是直接用手持设备采集视触觉数据。比如让环卫工人每天带上专用手套获取大量样本。但此类方法问题是如何解决“人手采集数据和机器人执行时数据的差异”。</li>
-</ul>
-</li>
-<li><p>多模态时间同步（视觉&#x2F;触觉采样率不一致）</p>
-</li>
-<li><p>跨传感器数据归一化</p>
-</li>
-</ul>
-]]></content>
-      <categories>
-        <category>学习笔记</category>
-      </categories>
-      <tags>
-        <tag>VLA</tag>
-        <tag>VTLA</tag>
-        <tag>paper</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>【工具】tmux基本使用</title>
     <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
     <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
@@ -233,6 +77,223 @@
       <tags>
         <tag>Prompt Engineering</tag>
         <tag>summer camp</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【学习笔记】VTLA相关概念总结</title>
+    <url>/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/</url>
+    <content><![CDATA[<h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><ul>
+<li><p><strong>接触密集型操作（Contact-Rich Manipulation）为什么视觉不够用</strong></p>
+<ul>
+<li>物体可能被手遮挡</li>
+<li>需要判断有没有对齐、力度够不够、是否打滑</li>
+</ul>
+</li>
+<li><p><strong>触觉能提供的信息类型</strong></p>
+<ul>
+<li>接触力&#x2F;摩擦&#x2F;滑动&#x2F;接触状态转移</li>
+</ul>
+</li>
+</ul>
+<h2 id="硬件基础"><a href="#硬件基础" class="headerlink" title="硬件基础"></a>硬件基础</h2><ul>
+<li><p><strong>视觉触觉传感器</strong></p>
+<ul>
+<li>GelSight&#x2F;DIGIT 等，原理：形变→内置摄像头成像</li>
+<li>传感器内部有一层软胶皮肤，接触变形后由内置摄像头拍照，再通过图像处理&#x2F;深度学习还原出接触形状、压力分布甚至滑动信息。</li>
+<li>本质上是把触觉问题转换成了图像问题，所以能直接复用视觉模型的架构（这也是为什么很多论文能把触觉塞进 VLA&#x2F;世界模型里）</li>
+</ul>
+</li>
+<li><p><strong>力&#x2F;压力传感器类（直接输出物理量，非图像）</strong></p>
+</li>
+<li><p><strong>传感器异构性问题（型号&#x2F;分辨率&#x2F;安装位置不同导致的迁移难题）</strong></p>
+</li>
+</ul>
+<h2 id="模型范式"><a href="#模型范式" class="headerlink" title="模型范式"></a>模型范式</h2><ul>
+<li><p><strong>VLA（Vision-Language-Action）</strong></p>
+<ul>
+<li>基本框架：观测 (O &#x3D; V + L) -&gt; 动作 (A)</li>
+<li>输入为</li>
+<li>输出为机器人动作序列（关节角度&#x2F;末端为姿等）</li>
+</ul>
+</li>
+<li><p><strong>VTLA（Vision-Tactile-Language-Action）</strong></p>
+<ul>
+<li>VLA基础上的扩展，加入tactile sensors</li>
+<li>问题：触觉信号怎么编码、怎么和VL对齐、怎么融合进动作生成</li>
+</ul>
+</li>
+<li><p><strong>World Model</strong></p>
+<ul>
+<li>路线：预测”下一步会怎样”，用于生成数据&#x2F;规划&#x2F;闭环校正</li>
+<li>O_t + A_t -&gt; O_t+1</li>
+<li>世界模型可以做：</li>
+<li>① 数据增强&#x2F;生成虚拟 rollout 训练数据；</li>
+<li>② 做 planning（在脑内试错，选最优动作再执行）；</li>
+<li>③ 做闭环校正（预测和真实触觉对不上时立刻纠偏）</li>
+</ul>
+</li>
+</ul>
+<h2 id="表征与编码"><a href="#表征与编码" class="headerlink" title="表征与编码"></a>表征与编码</h2><ul>
+<li><p><strong>Encoder 的含义</strong><br>  特征提取器（一段神经网络），区别于物理编码器（位移&#x2F;角度编码器）</p>
+</li>
+<li><p><strong>特征向量&#x2F;embedding 的产生方式</strong></p>
+<ul>
+<li>离散的L信息（通过tokenizer划分成token）通过embedding table（形状为[词表大小, 向量维度]的矩阵）方式获得初始向量（查找token对应的一行）</li>
+<li>连续的VT信息均通过特定训练的一段神经网络（encoder）得到特征向量（这个特征空间可以是语义空间（类似CLIP embedding做对齐），也可以是单独适配该encoder的空间）</li>
+<li>连续信号靠网络计算 vs 离散 token 查 embedding table</li>
+</ul>
+</li>
+<li><p><strong>多模态对齐的本质：不同模态最终都变成同一空间下的向量&#x2F;token</strong></p>
+<br></li>
+</ul>
+<h2 id="模态融合方式"><a href="#模态融合方式" class="headerlink" title="模态融合方式"></a>模态融合方式</h2><ul>
+<li><p><strong>早期融合 vs 晚期融合</strong></p>
+<ul>
+<li>早期融合：不同模态信息经过modality-specific encoder后，拼接一起进VLA backbone</li>
+<li>晚期融合：不同模态信息经过modality-specific encoder后，通过cross-attention等机制进行信息融合</li>
+<li>目前很多VLA模型中VL信息采用early fusion，state信息采用conditioning(融合进入head部分，而非late fusion)</li>
+</ul>
+</li>
+<li><p><strong>Cross-attention &#x2F; cross-view attention</strong></p>
+<ul>
+<li>若采用晚期融合，可以新增一个触觉编码器 + 新增的 cross-attention 层。</li>
+<li>例如触觉token做Query，视觉token做Key&#x2F;Value</li>
+</ul>
+</li>
+<li><p><strong>Contact-aware fusion</strong></p>
+<ul>
+<li>根据接触状态动态调整融合权重（包括VTL等信息的权重 &amp; 每种信息中某特定部分的权重，比如图像中的某部分）</li>
+</ul>
+</li>
+</ul>
+<h2 id="训练范式"><a href="#训练范式" class="headerlink" title="训练范式"></a>训练范式</h2><ul>
+<li><p><strong>自监督预训练（对比学习、掩码重建——针对 encoder，无需动作标签）</strong></p>
+<ul>
+<li>有动作标注的数据很稀缺，但无标签的数据很容易采集。因此在训练encoder时，往往可以先用无标签的数据，使之学会”怎么把原始信号压缩成有语义的特征向量”，后续可以冻结或微调encoder</li>
+<li>常见方法：</li>
+<li>对比学习（比如让同一时刻拍到的触觉图和视觉图的向量距离拉近，不同时刻&#x2F;不同物体的推远，类似 CLIP 的思路）；</li>
+<li>掩码重建（遮住触觉图的一部分，让模型学着补全，类似 MAE）。这两种都不需要动作标签。</li>
+</ul>
+</li>
+<li><p><strong>模仿学习&#x2F;行为克隆（针对策略本身，需要示教数据里的动作标签）</strong></p>
+</li>
+<li><p><strong>微调 vs 全量微调 vs LoRA（后训练阶段的几种方式及各自代价）</strong></p>
+<ul>
+<li>微调为“后训练”中的一种，在VLA中是指拿成熟的VLM模型，在自己的小规模机器人数据上训练，进而适应具体任务。</li>
+<li>全量微调是指，模型中所有参数都参与更新。效果通常最好但显存&#x2F;算力开销大，而且容易”灾难性遗忘”（把预训练学到的通用知识冲掉）</li>
+<li>LoRA：冻结原始权重，只在部分层（通常是注意力层）旁边插入两个小的低秩矩阵，只训练这两个小矩阵，参数量可能只有原模型的 0.1%~1%</li>
+</ul>
+</li>
+</ul>
+<h2 id="动作生成机制"><a href="#动作生成机制" class="headerlink" title="动作生成机制"></a>动作生成机制</h2><ul>
+<li><strong>Diffusion Policy</strong><ul>
+<li>用去噪过程建模多峰动作分布</li>
+<li>Policy即策略，用于 VLA 的 Diffusion model </li>
+<li>很多任务里”正确动作”不是唯一的，比如绕开障碍物可以往左也可以往右，这叫动作分布是多峰的（multimodal）。如果用普通回归去拟合多峰分布，模型会学出”左右取平均”这种谁都不对的动作。</li>
+<li>扩散模型天生擅长建模复杂&#x2F;多峰分布（它本质是在学一个概率分布，而不是学一个确定的函数）。所以 Diffusion Policy 就是：把”给定观测，生成一段动作”这件事，做成”以观测为条件，从噪声去噪出动作序列”的扩散过程。</li>
+<li>V + L + State（state 也可能在 head 中加入） -&gt; VLA backbone -&gt; head -&gt; Diffusion action head -&gt; Action chunk</li>
+</ul>
+</li>
+<li><strong>Action Chunking（一次生成一段动作，receding horizon 执行）</strong><ul>
+<li><strong>核心思路</strong>：模型不是逐帧预测单个 action，而是一次性生成一段未来动作序列（action chunk，长度记作 <code>horizon</code>），比如未来 16 步。</li>
+<li><strong>为什么不逐帧预测</strong>：<ul>
+<li>逐帧预测容易产生<strong>复合误差累积</strong>（compounding error）——每一步的小误差会传递到下一步，长时间执行后轨迹漂移严重；</li>
+<li>一次预测一整段序列，模型能在 chunk 内部保持动作的<strong>时序一致性</strong>（比如推方块时保持连贯的推的方向，而不是每步各自为政）。</li>
+</ul>
+</li>
+<li><strong>但不会整段执行完</strong>：生成的 <code>horizon</code> 步动作里，实际只执行前面 <code>n_action_steps</code> 步（比如 horizon&#x3D;16，只执行前 8 步），然后：<ol>
+<li>获取新的观测（observation）；</li>
+<li>丢弃剩余未执行的动作；</li>
+<li>基于新观测重新生成一段新的 action chunk。</li>
+</ol>
+</li>
+<li><strong>这个”预测长、执行短、滚动重规划”的模式就叫 receding horizon（也叫 rolling replanning &#x2F; model predictive control 的思路）</strong>。</li>
+</ul>
+</li>
+</ul>
+<h2 id="控制与反馈"><a href="#控制与反馈" class="headerlink" title="控制与反馈"></a>控制与反馈</h2><ul>
+<li><p><strong>开环执行的盲区（action chunk 执行期间为何”看不见”新变化）</strong></p>
+<ul>
+<li>如果一次生成一个action chunk，执行完这一整段才重新看新观测”——这一整段执行期间，模型对新的触觉变化是”看不见&#x2F;不响应”的，是开环执行</li>
+</ul>
+</li>
+<li><p><strong>高频反射式校正（低层快速闭环 vs 高层慢速规划的分工）</strong></p>
+<ul>
+<li>可单独设计一个小模块，比较”世界模型&#x2F;上一步预测的触觉信号”和”传感器实际测到的触觉信号”，如果有偏差（比如实际接触力比预测的大很多，说明可能要打滑了），就在当前正在执行的动作 chunk 上做一个小幅度的实时修正，而不必等下一次完整的大模型推理。</li>
+<li>大模型的完整推理循环像是”深思熟虑做计划”，而这个高频反射校正更像是人被烫到时的脊髓反射——不用等大脑（VLA）反应过来，先做个快速的局部纠正动作。</li>
+</ul>
+</li>
+</ul>
+<h2 id="数据处理"><a href="#数据处理" class="headerlink" title="数据处理"></a>数据处理</h2><ul>
+<li><p><strong>遥操作采集及其成本问题</strong></p>
+<ul>
+<li>遥操作（teleoperation）可以粗暴理解为遥控机器人工作来采集数据</li>
+</ul>
+</li>
+<li><p><strong>Robot-free &#x2F; 免机器人采集方案</strong></p>
+<ul>
+<li>新兴方法是直接用手持设备采集视触觉数据。比如让环卫工人每天带上专用手套获取大量样本。但此类方法问题是如何解决“人手采集数据和机器人执行时数据的差异”。</li>
+</ul>
+</li>
+<li><p><strong>多模态时间同步（视觉&#x2F;触觉采样率不一致）</strong></p>
+</li>
+<li><p><strong>跨传感器数据归一化</strong></p>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>学习笔记</category>
+      </categories>
+      <tags>
+        <tag>VLA</tag>
+        <tag>VTLA</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【学习笔记】训练与评估</title>
+    <url>/2026/09/15/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/</url>
+    <content><![CDATA[<h2 id="1-模型与优化（Optimization）"><a href="#1-模型与优化（Optimization）" class="headerlink" title="1. 模型与优化（Optimization）"></a>1. 模型与优化（Optimization）</h2><ul>
+<li>EMA<ul>
+<li>训练时除梯度下降正常更新参数 θ_t 之外，设置影子参数 θ_shadow ，在训练过程中影子参数更新速度慢，它跟着真实参数走，不参与反向传播，只是被动更新：  <figure class="highlight python"><table><tr><td class="code"><pre><span class="line">θ_shadow = decay * θ_shadow + (<span class="number">1</span> - decay) * θ_t</span><br></pre></td></tr></table></figure></li>
+<li>decay 一般取 0.999。在 eval 时用 θ_shadow 通常比用最后一步的 θ_t 更稳定、泛化更好。</li>
+</ul>
+</li>
+<li>batch size 的影响<ul>
+<li>batch_size 越大，训练速度越快，但是越容易过拟合。</li>
+</ul>
+</li>
+<li>学习率调度（warmup、cosine decay…）</li>
+<li>优化器（Adam、SGD、AdamW 的区别…）</li>
+<li>（以后遇到新的都加在这）</li>
+</ul>
+<h2 id="2-数据与正则化（Data-Regularization）"><a href="#2-数据与正则化（Data-Regularization）" class="headerlink" title="2. 数据与正则化（Data &amp; Regularization）"></a>2. 数据与正则化（Data &amp; Regularization）</h2><p>概念只要和”怎么防止模型死记硬背训练集”有关，都进这里</p>
+<ul>
+<li>图像增强</li>
+<li>Dropout</li>
+<li>Weight decay</li>
+<li>数据归一化 &#x2F; normalization</li>
+<li>（以后遇到新的都加在这）</li>
+</ul>
+<h2 id="3-训练诊断（Diagnostics）"><a href="#3-训练诊断（Diagnostics）" class="headerlink" title="3. 训练诊断（Diagnostics）"></a>3. 训练诊断（Diagnostics）</h2><p>概念只要和”训练过程中该看什么信号来判断训得好不好”有关</p>
+<ul>
+<li>loss 曲线的陷阱（plateau ≠ 收敛）</li>
+<li>过拟合 &#x2F; 欠拟合的信号</li>
+<li>梯度消失&#x2F;爆炸</li>
+<li>（以后遇到新的都加在这）</li>
+</ul>
+<h2 id="4-评估与实验设计（Evaluation-Experimental-Design）"><a href="#4-评估与实验设计（Evaluation-Experimental-Design）" class="headerlink" title="4. 评估与实验设计（Evaluation &amp; Experimental Design）"></a>4. 评估与实验设计（Evaluation &amp; Experimental Design）</h2><p>概念只要和”怎么设计一个能下结论的实验”有关</p>
+<ul>
+<li>Beta 后验 &#x2F; 可信区间</li>
+<li>paired comparison vs unpaired</li>
+<li>样本量与统计功效</li>
+<li>（以后遇到新的都加在这）</li>
+</ul>
+]]></content>
+      <categories>
+        <category>学习笔记</category>
+      </categories>
+      <tags>
+        <tag>Deep Learning</tag>
       </tags>
   </entry>
   <entry>
@@ -391,15 +452,115 @@ $$ -->
         <category>论文笔记</category>
       </categories>
       <tags>
-        <tag>paper</tag>
         <tag>CG</tag>
+        <tag>paper</tag>
         <tag>neural-rendering</tag>
       </tags>
   </entry>
   <entry>
-    <title>【论文笔记】OpenGaussian</title>
-    <url>/2025/05/14/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian/</url>
-    <content><![CDATA[<h2 id="论文是做什么的"><a href="#论文是做什么的" class="headerlink" title="论文是做什么的"></a>论文是做什么的</h2><p>OpenGaussian（NeurIPS 2024）解决的问题是：给定一个 3D 场景，能不能用自然语言查询找到对应的物体，并精确定位到 3D 点级别。</p>
+    <title>【论文笔记】STAMP方法论精读</title>
+    <url>/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/</url>
+    <content><![CDATA[<p><strong>STAMP: Scalable Task And Model-agnostic Collaborative Perception 方法论部分精读</strong><br><br>项目网页链接：<a href="https://xiangbogaobarry.github.io/STAMP/">https://xiangbogaobarry.github.io/STAMP/</a></p>
+<p><strong>一句话总结</strong></p>
+<p>简易版：STAMP是一个改进版支持异构代理的协同感知框架。</p>
+<p>详细版：STAMP是一个为异构代理量身定制的可扩展的任务和模型不可知的协同感知框架。</p>
+<div class="timeline undefined"><div class='timeline-item headline'><div class='timeline-item-title'><div class='item-circle'><p>相关进展</p>
+</div></div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>OpenCOOD</p>
+</div></div><div class='timeline-item-content'><p>协同感知框架</p>
+</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>HEAL</p>
+</div></div><div class='timeline-item-content'><p>支持异构的协同感知框架</p>
+</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>STAMP</p>
+</div></div><div class='timeline-item-content'><p>方法改良的支持异构的协同感知框架</p>
+</div></div></div>
+
+
+<h1 id="现有CP-process"><a href="#现有CP-process" class="headerlink" title="现有CP process"></a>现有CP process</h1><p>N个代理（agent）每个都有自己的CP模型</p>
+<p>本文所有CP都用中间融合</p>
+<p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
+<h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" /></center>
+
+<ul>
+<li><strong>Encoding</strong>: input sensor data → BEV feature</li>
+<li><strong>Compression</strong>: BEV feature → compressed BEV feature</li>
+</ul>
+<p>📢 broadcasting compressed BEV feature to other agents in range δ</p>
+<p>📬 receiving other BEV features from other agents</p>
+<ul>
+<li><strong>Decompression</strong>: compressed BEV feature from j → BEV feature j (using decompressor i)</li>
+<li><strong>Fusion</strong>: all BEV features in range δ → new BEV feature i</li>
+<li><strong>Decoding</strong>: new BEV feature i → output i</li>
+</ul>
+<h1 id="STAMP框架"><a href="#STAMP框架" class="headerlink" title="STAMP框架"></a>STAMP框架</h1><p>用adaptation和reversion替代compression和decompression</p>
+<p>即设计adapter和reverter</p>
+<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" /></center>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" /></center>
+
+<ul>
+<li>…</li>
+<li><strong>Adaptation</strong>: local BEV feature i → protocol feature i (BEV)</li>
+</ul>
+<p>📢 broadcasting protocol feature to other agents in range δ</p>
+<p>📬 receiving other protocol features from other agents</p>
+<ul>
+<li><strong>Reversion</strong>: other protocol features → reverted protocol features</li>
+<li><strong>Fusion</strong>: reverted protocol features + locol BEV feature i → new BEV feature i</li>
+<li>…</li>
+</ul>
+<p>STAMP支持不同<strong>模态modality</strong>(eg. m1 m2 …)、<strong>模型架构model_architecture</strong>(eg. Encoder: Resnet101 EfficientNet)和<strong>下游任务downstream_task</strong>的代理。</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:550px" /></center>
+
+<h1 id="协同特征对齐模块（CFA）"><a href="#协同特征对齐模块（CFA）" class="headerlink" title="协同特征对齐模块（CFA）"></a>协同特征对齐模块（CFA）</h1><p>CFA：用来训练统一的BEV feature表示和每个代理的adapter-reverter对</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:500px" /></center>
+
+<h2 id="CFA训练流程："><a href="#CFA训练流程：" class="headerlink" title="CFA训练流程："></a>CFA训练流程：</h2><ol>
+<li><p>训练 protocol network</p>
+<p> 与传统CP流程类似</p>
+<p> protocol encoder: Ep</p>
+<p> (compressor and decompressor为恒等函数 即输入&#x3D;输出)</p>
+<p> protocol fusion model: Up</p>
+<p> protocol decoder: Dp</p>
+</li>
+<li><p>训练 local adapter-reverters</p>
+<p> Τ（模态变换函数）: Χ（周围环境状态） → I（输入数据）</p>
+<p> Ti是local model的传感器模态，Tp是protocol model的传感器模态。二者分别把传感器信息转化成Ii和Ip给Ei和Ep，再转化为Fi和Fp。</p>
+<p> 因此adapter的作用是填补T和E叠加出的domian gap，其训练的目标函数即Fp与Φi(Fi)的特征对齐损失。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" /></center>
+ 
+<p> 对应地，reverter的目标函数可为Ψi(Fp)与Fi的特征对齐损失。而本文在此基础上增加了一个额外监督，即Ψi(Fp)与Ψi(Φi(Fi))的特征对齐损失。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" /></center>
+ 
+<p> 对于这个“特征对齐”，将在特征空间和决策空间两处进行。</p>
+</li>
+<li><p>特征空间对齐</p>
+<p> 用L2-norm对齐Fp与Φi(Fi)、Ψi(Fp)与Fi、Ψi(Fp)与Ψi(Φi(Fi))。</p>
+<p> 共K个周围环境状态，因此共K组3对特征对</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" /></center>
+ </li>
+<li><p>决策空间对齐</p>
+<p> 此处损失函数是针对下游任务设计的，有local和protocol版本。GT为ground truth labels。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" /></center>
+
+<p> 在此基础上加入权重，总损失函数如下：</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></center></li>
+</ol>
+<h1 id="adapter和reverter的结构"><a href="#adapter和reverter的结构" class="headerlink" title="adapter和reverter的结构"></a>adapter和reverter的结构</h1><p>domian gap三大来源：空间分辨率、feature patterns、通道尺寸。</p>
+<p>空间分辨率：采用简单的线性插值进行对齐</p>
+<p>feature patterns：用三个具有隐藏通道维度Chidden的ConvNeXt层对齐</p>
+<p>通道尺寸：用两个额外的卷积层对齐</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" /></center>]]></content>
+      <categories>
+        <category>论文笔记</category>
+      </categories>
+      <tags>
+        <tag>paper</tag>
+        <tag>collaborative perception</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【项目笔记】OpenGaussian改造设计</title>
+    <url>/2026/05/14/%E3%80%90%E9%A1%B9%E7%9B%AE%E7%AC%94%E8%AE%B0%E3%80%91OpenGaussian%E6%94%B9%E9%80%A0%E8%AE%BE%E8%AE%A1/</url>
+    <content><![CDATA[<h2 id="论文是做什么的"><a href="#论文是做什么的" class="headerlink" title="论文是做什么的"></a>论文是做什么的</h2><p><a href="https://3d-aigc.github.io/OpenGaussian/">OpenGaussian（NeurIPS 2024）</a>解决的问题是：给定一个 3D 场景，能不能用自然语言查询找到对应的物体，并精确定位到 3D 点级别。</p>
 <p>这个问题以前也有人做，但大多数方法是在 2D 像素级别做语义理解，3D 只是顺带的。OpenGaussian 的出发点是：直接给每个 3D Gaussian 关联一个语义特征，这样查询结果天然就是 3D 点级别的，不需要从 2D 反投影。</p>
 <p>场景表示用的是 3D Gaussian Splatting（3DGS）。3DGS 把场景表示成一堆椭球形的高斯球，每个球有位置、颜色、透明度等属性，渲染速度很快。OpenGaussian 在每个高斯球上额外加了一个实例特征向量，用来区分不同物体。</p>
 <h2 id="方法：四个阶段"><a href="#方法：四个阶段" class="headerlink" title="方法：四个阶段"></a>方法：四个阶段</h2><p>整个训练流程分四个阶段，逻辑上是递进的。</p>
@@ -571,13 +732,13 @@ $$ -->
 <td align="right"><strong>+0.0585</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#99;&#x63;&#x40;&#x30;&#x2e;&#x32;&#x35;">&#x41;&#99;&#x63;&#x40;&#x30;&#x2e;&#x32;&#x35;</a></td>
+<td><a href="mailto:&#65;&#x63;&#x63;&#x40;&#48;&#x2e;&#x32;&#x35;">&#65;&#x63;&#x63;&#x40;&#48;&#x2e;&#x32;&#x35;</a></td>
 <td align="right">0.2958</td>
 <td align="right"><strong>0.3662</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#99;&#x63;&#x40;&#x30;&#46;&#53;">&#x41;&#99;&#x63;&#x40;&#x30;&#46;&#53;</a></td>
+<td><a href="mailto:&#x41;&#x63;&#99;&#x40;&#48;&#46;&#x35;">&#x41;&#x63;&#99;&#x40;&#48;&#46;&#x35;</a></td>
 <td align="right">0.1690</td>
 <td align="right"><strong>0.2394</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
@@ -641,13 +802,13 @@ $$ -->
 <td align="right"><strong>0.3379</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#x32;&#x35;">&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#x32;&#x35;</a></td>
+<td><a href="mailto:&#65;&#x63;&#x63;&#x40;&#48;&#x2e;&#50;&#53;">&#65;&#x63;&#x63;&#x40;&#48;&#x2e;&#50;&#53;</a></td>
 <td align="right">0.2958</td>
 <td align="right">0.3662</td>
 <td align="right"><strong>0.4648</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#x63;&#x40;&#x30;&#46;&#53;">&#65;&#99;&#x63;&#x40;&#x30;&#46;&#53;</a></td>
+<td><a href="mailto:&#x41;&#x63;&#x63;&#x40;&#48;&#x2e;&#x35;">&#x41;&#x63;&#x63;&#x40;&#48;&#x2e;&#x35;</a></td>
 <td align="right">0.1690</td>
 <td align="right">0.2394</td>
 <td align="right"><strong>0.3803</strong></td>
@@ -663,8 +824,8 @@ $$ -->
 <th>train</th>
 <th>render</th>
 <th align="right">mIoU</th>
-<th align="right"><a href="mailto:&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#50;&#53;">&#65;&#99;&#x63;&#64;&#x30;&#x2e;&#50;&#53;</a></th>
-<th align="right"><a href="mailto:&#65;&#99;&#x63;&#x40;&#48;&#x2e;&#53;">&#65;&#99;&#x63;&#x40;&#48;&#x2e;&#53;</a></th>
+<th align="right"><a href="mailto:&#x41;&#x63;&#x63;&#64;&#x30;&#46;&#x32;&#x35;">&#x41;&#x63;&#x63;&#64;&#x30;&#46;&#x32;&#x35;</a></th>
+<th align="right"><a href="mailto:&#x41;&#x63;&#99;&#64;&#48;&#x2e;&#x35;">&#x41;&#x63;&#99;&#64;&#48;&#x2e;&#x35;</a></th>
 </tr>
 </thead>
 <tbody><tr>
@@ -697,112 +858,104 @@ $$ -->
 <p>还有一类问题这两个改动都没有解决：<code>corn</code>、<code>onion segments</code> 这类小目标，上游 SAM 就已经分不好，后面怎么改匹配逻辑都很难救回来。伪标签质量和小目标处理是后续值得单独看的方向。</p>
 ]]></content>
       <categories>
-        <category>散记</category>
+        <category>项目笔记</category>
       </categories>
       <tags>
         <tag>3DGS</tag>
         <tag>open vocabulary</tag>
-        <tag>具身感知</tag>
+        <tag>具身智能</tag>
       </tags>
   </entry>
   <entry>
-    <title>【论文笔记】STAMP方法论精读</title>
-    <url>/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/</url>
-    <content><![CDATA[<p><strong>STAMP: Scalable Task And Model-agnostic Collaborative Perception 方法论部分精读</strong><br><br>项目网页链接：<a href="https://xiangbogaobarry.github.io/STAMP/">https://xiangbogaobarry.github.io/STAMP/</a></p>
-<p><strong>一句话总结</strong></p>
-<p>简易版：STAMP是一个改进版支持异构代理的协同感知框架。</p>
-<p>详细版：STAMP是一个为异构代理量身定制的可扩展的任务和模型不可知的协同感知框架。</p>
-<div class="timeline undefined"><div class='timeline-item headline'><div class='timeline-item-title'><div class='item-circle'><p>相关进展</p>
-</div></div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>OpenCOOD</p>
-</div></div><div class='timeline-item-content'><p>协同感知框架</p>
-</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>HEAL</p>
-</div></div><div class='timeline-item-content'><p>支持异构的协同感知框架</p>
-</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>STAMP</p>
-</div></div><div class='timeline-item-content'><p>方法改良的支持异构的协同感知框架</p>
-</div></div></div>
+    <title>【项目笔记】PushT-contact-DiffusionPolicy</title>
+    <url>/2026/09/16/%E3%80%90%E9%A1%B9%E7%9B%AE%E7%AC%94%E8%AE%B0%E3%80%91PushT-contact-DiffusionPolicy/</url>
+    <content><![CDATA[<h1 id="给视觉-Diffusion-Policy-加一个接触先验：实验记录"><a href="#给视觉-Diffusion-Policy-加一个接触先验：实验记录" class="headerlink" title="给视觉 Diffusion Policy 加一个接触先验：实验记录"></a>给视觉 Diffusion Policy 加一个接触先验：实验记录</h1><h2 id="一、从一个假设说起"><a href="#一、从一个假设说起" class="headerlink" title="一、从一个假设说起"></a>一、从一个假设说起</h2><p><a href="https://github.com/huggingface/lerobot">LeRobot</a> 里的视觉版 <a href="https://diffusion-policy.cs.columbia.edu/">Diffusion Policy</a> 在 <a href="https://huggingface.co/lerobot/diffusion_pusht">PushT 任务上</a>的输入很简单：一张 96×96 的 RGB 图像，加上 agent 的二维位置，输出未来一段时间的动作序列。图像里其实已经隐式包含了 agent 有没有碰到 T 形块这个信息——只是策略网络得自己从像素里把这个关系学出来。</p>
+<p>我想验证的问题是：如果把”是否接触”这个信息以显式特征的形式直接提供给策略，会不会降低学习这层关系的难度，从而在样本效率或成功率上带来提升。</p>
+<p>需要先说清楚一件事：这里的”接触信号”不是真实的触觉传感器读数，而是根据 agent 和 T 形块的几何关系算出来的一个代理信号。整篇文章里我会一直用”几何接触先验”这个更准确的说法，避免让人误以为这是一次真实的触觉集成实验。</p>
+<p>提前说结论：这次实验证明了一条完整可用的工程链路，但没有证明接触先验本身有效——不是因为它被验证无效，而是因为现在的证据强度还不足以支持任何一个方向的结论。原因会在后面几节慢慢展开，其中训练配置核实和评估结果这两节的发现是我最初没预料到的。</p>
+<h2 id="二、Diffusion-Policy-概览：从观测到动作序列"><a href="#二、Diffusion-Policy-概览：从观测到动作序列" class="headerlink" title="二、Diffusion Policy 概览：从观测到动作序列"></a>二、Diffusion Policy 概览：从观测到动作序列</h2><p>在动手改造之前，有必要先把 Diffusion Policy 本身的机制过一遍。</p>
+<p>策略网络接收最近几步的观测（图像经过视觉编码器、加上本体状态），把它们编码成一个条件向量。训练时，从数据集里取一段真实的动作序列，随机选一个扩散时间步，按 DDPM 的加噪公式把这段序列加噪，网络的任务是去预测加进去的那份噪声，条件向量通过 FiLM 层调制网络中间层。这本质上是把 DDPM 从”给图像去噪”搬到了”给一段动作序列去噪”。</p>
+<p>推理时反过来：从纯高斯噪声出发，反复调用网络做反向去噪，迭代若干步后得到一段预测的动作序列。执行时并不会把这段序列全部跑完——只执行开头的一小部分，然后拿新的观测重新走一遍整套流程，这种”receding horizon”的执行方式让策略既能利用长序列规划的稳定性，又能对新的观测保持反应能力。</p>
+<p>这也是接触先验要插入的位置：它不改变去噪目标本身，只是给条件向量多提供一维信息，理论上让模型更容易判断”什么时候该开始精细调整”。</p>
+<h2 id="三、构造接触先验：两个数据集、八个关键点"><a href="#三、构造接触先验：两个数据集、八个关键点" class="headerlink" title="三、构造接触先验：两个数据集、八个关键点"></a>三、构造接触先验：两个数据集、八个关键点</h2><p>LeRobot 官方提供的 <code>lerobot/pusht</code> 数据集只有图像和二维 agent 位置，没有 T 形块的几何信息，没法直接算接触信号。好在还有一个 <code>lerobot/pusht_keypoints</code> 数据集，提供了对齐的 16 维 <code>observation.environment_state</code>，也就是 T 形块的 8 个二维关键点。</p>
+<p>先验证了一件容易被忽略的事：两个数据集是不是同一批演示数据的不同导出版本——按 frame index 对齐后确认样本 0 的 agent state 完全一致，才敢放心地逐帧拼接两个数据集的信息。</p>
+<p>T 形块由两个矩形拼成，8 个关键点按前 4 个、后 4 个分别构造成两个矩形。接触信号的定义是 agent 圆心到这两个矩形的最近欧氏距离，取两者中较小的一个：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">d = min(distance(agent_center, rectangle_a), distance(agent_center, rectangle_b))</span><br><span class="line">contact = 1.0 if d &lt;= 15.5 else 0.0</span><br></pre></td></tr></table></figure>
 
-
-<h1 id="现有CP-process"><a href="#现有CP-process" class="headerlink" title="现有CP process"></a>现有CP process</h1><p>N个代理（agent）每个都有自己的CP模型</p>
-<p>本文所有CP都用中间融合</p>
-<p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
-<h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" /></center>
-
+<p>15.5 这个阈值来自 agent 半径 15，加上 0.5 的安全余量。用二值信号的好处是语义清楚，代价是丢掉了距离的连续信息，也引入了阈值本身是否合理这个新的不确定性——这个后面会再提一句。</p>
+<h2 id="四、把-observation-state-从二维扩展到三维"><a href="#四、把-observation-state-从二维扩展到三维" class="headerlink" title="四、把 observation.state 从二维扩展到三维"></a>四、把 observation.state 从二维扩展到三维</h2><p>算好逐帧的接触信号之后，把它拼接到原来的二维 <code>observation.state</code> 后面，保存成一份本地 LeRobot 数据集。这一步最省心的地方是：LeRobot 会从数据集的元信息里自动推导 <code>observation.state</code> 的输入维度，不需要去改 <code>DiffusionConfig</code> 的源码，训练脚本对二维还是三维输入是无感的。</p>
+<p>图像输入本身没有变化，改动完全在状态向量这一侧，这样能保证对照实验里唯一变化的变量确实只有这一维接触信号。</p>
+<h2 id="五、训练和在线评估之间的一致性问题"><a href="#五、训练和在线评估之间的一致性问题" class="headerlink" title="五、训练和在线评估之间的一致性问题"></a>五、训练和在线评估之间的一致性问题</h2><p>这是整个项目里工程量最大的一部分。离线训练时接触信号是逐帧算好、拼在数据集里的，但在线跑仿真评估时不是这样——环境每一步吐出来的原始观测里只有 <code>pixels</code> 和 <code>agent_pos</code>，没有 T 形块的几何信息。</p>
+<p><code>info</code> 字典里倒是有一个 <code>block_pose</code>，一开始想着直接用它自己重建关键点，但很快发现更稳妥的做法是复用环境本身提供的 <code>get_keypoints</code> 接口——它和数据集里的关键点定义是同一套坐标系统和顺序，自己重建反而更容易在坐标系或点的排列顺序上出错。</p>
+<p>最终方案是写一个 <code>gym.Wrapper</code>，在 <code>reset</code> 和每次 <code>step</code> 之后调用 <code>get_keypoints</code> 拿到当前 T 形块的关键点，复用和离线训练完全相同的几何计算函数，把结果追加到 <code>agent_pos</code> 后面，同时把 <code>observation_space</code> 里 <code>agent_pos</code> 的维度声明从 2 改成 3。这个方案没有改动 <code>gym_pusht</code> 或 LeRobot 主仓库任何代码，实验改动完全隔离在自己的 wrapper 里。</p>
+<p>这一节想强调的经验是：训练和在线评估其实是一套接口契约，特征的维度、语义、关键点顺序、阈值这些必须两边完全一致，任何一处悄悄分叉，模型看到的分布就变了，而这种偏差往往不会直接报错，只会安静地拖累效果，很难第一时间意识到。</p>
+<h2 id="六、调试笔记：几个值得记的坑"><a href="#六、调试笔记：几个值得记的坑" class="headerlink" title="六、调试笔记：几个值得记的坑"></a>六、调试笔记：几个值得记的坑</h2><p><strong>preprocessor &#x2F; postprocessor 和归一化的关系</strong>——训练时会在数据集上算出每个 key 的统计量（均值方差或 min&#x2F;max），存进 checkpoint。新版 LeRobot 把”改 key 名、加 batch 维、搬设备、按统计量归一化”这一串操作封装成 preprocessor，把”策略输出的动作从归一化空间转换回真实坐标尺度”封装成 postprocessor。这两个不是可选的便利功能，而是模型输入输出的契约本身。跳过它们最直接的后果是：agent 会被输出的动作拉到画面之外的负数坐标——因为模型的输出其实一直停留在归一化空间，没有被正确地转换回真实尺度。</p>
+<p><strong>看起来像真值的字段不一定是真值</strong>——排查过程中一度想直接用环境里一个叫 <code>n_contacts</code> 的字段作为标签来源，后来发现它的语义并没有隔离到”agent 和 T 形块”这一对具体关系上，不适合直接当作接触判定的真值，改用自己按几何关系显式计算的方式更可靠。</p>
+<p><strong>checkpoint 路径要每次核对</strong>——在多个训练版本、多个 step 之间切换评估脚本时，很容易在复制粘贴命令时漏改路径，评估了错误的 checkpoint 却浑然不觉。这个坑很低级，但发生频率不低，值得养成每次运行前打印一遍实际路径的习惯。</p>
+<h2 id="七、评估协议：怎么避免被噪声带偏结论"><a href="#七、评估协议：怎么避免被噪声带偏结论" class="headerlink" title="七、评估协议：怎么避免被噪声带偏结论"></a>七、评估协议：怎么避免被噪声带偏结论</h2><p>第一版评估脚本只跑了单个 episode，看着 agent 完成了任务，很容易就想得出”接触信号有效”的结论。但单局成功只能说明链路能跑通、行为合理，不能替代成批对照——不同初始条件下同一个模型的表现本身就有很大方差。</p>
+<p>批量跑之后发现问题更明显。用 20 个 episode 对比 baseline 和接触版本，两次实验里谁更好这个结论完全不稳定：一次是接触版本成功率更高，另一次接触版本的平均 reward 反而更低。这不是巧合，而是样本量太小导致的必然结果——在真实成功率在 15% 附近时，20 个 episode 下成功率的 95% 区间宽达 ±15 个百分点左右，也就是说观测到的差异基本完全落在噪声范围内，不能用来支持任何结论。</p>
+<p>更准确地说，这个区间不是频率学派意义上的置信区间，而是贝叶斯的 Beta 后验可信区间：把”完全无偏好”的 <code>Beta(1,1)</code> 先验，结合观测到的 k&#x2F;n 成功次数，更新成后验分布 <code>Beta(k+1, n-k+1)</code>，再从这条后验密度曲线上切出中间 95% 的面积对应的成功率范围。它比传统置信区间更适合小样本下的成功率估计——天然限制在 [0,1] 之间，且不需要多次重复实验去”画曲线”，一次 eval 的 k 和 n 就足以完整确定整条后验曲线。判断两个模型是否有真实差异的实用标准很直接：把两组的后验区间摆在一起，如果大幅重叠，就说明现有数据不足以支持”两者有差异”这个结论。</p>
+<p>评估协议里另一个容易被忽视的细节是 seed。这里其实有两层完全不同的东西：</p>
+<p>训练时设置的 seed，控制的是权重初始化、数据打乱顺序、以及扩散过程里噪声和时间步采样这一整条随机数消耗序列的起点。看起来给 baseline 和接触版本设置同一个训练 seed 就能让两次训练完全可比，但接触版本因为输入多了一维，网络第一层的参数形状不同，仅仅是初始化这一步要消耗的随机数数量就和 baseline 不一样，后面数据打乱和噪声采样也就跟着错位了。所以训练 seed 相同只能减少一部分差异带来的噪声，没法做到完全对齐。</p>
+<p>评估时的 seed 是另一回事——<code>env.reset(seed=ep)</code> 控制的是仿真环境自己的随机数生成器，只用来决定这一局的初始局面（T 形块和 agent 的起始位置），和策略网络内部的随机性完全独立，不会受模型结构差异影响。所以固定评估 seed 才是真正精确的对齐：只要用同一串 seed，两个模型面对的就是完全相同的一组初始局面，这才是能拿来做公平对比的部分。</p>
+<p>最终的评估协议定下来是：baseline 和接触版本用完全相同的一串 seed 跑仿真环境，训练超参、图像输入、最大 rollout 步数全部保持一致，唯一有意改变的变量是那一维接触信号；结果同时报告成功数除以总局数（<code>success_rate</code>）和所有 episode（含失败）的平均连续覆盖率分数（<code>avg_reward</code>）——后者比二值化的 success_rate 更细粒度，能看出”虽然都没成功，但谁推得更接近目标”这类信息，两个指标合起来看，比只看一个更不容易被单一指标的噪声误导。</p>
+<h2 id="八、训练规模核实：一次比想象中更彻底的返工"><a href="#八、训练规模核实：一次比想象中更彻底的返工" class="headerlink" title="八、训练规模核实：一次比想象中更彻底的返工"></a>八、训练规模核实：一次比想象中更彻底的返工</h2><p>第七节解决的是”怎么公平地比较两个模型”，但这一节要交代的是一个更基础的问题：<strong>在开始纠结比较方法之前，这两个模型本身是不是都训练充分了？</strong></p>
+<p>答案是否定的，而且差距比最初以为的更大。</p>
+<p><strong>先从 loss 曲线的一个误导性信号说起。</strong> 早期训练的 <code>train/loss</code> 曲线在不到 1000 个 step 就从初始值快速下降，之后一路到一万多个 step 都停留在一个很平坦的区间，几乎看不出再下降。这个现象本身很容易被解读成”模型已经学得差不多了，继续训大概率是浪费算力”——我一度也是这么想的。</p>
+<p>直到把这条曲线和 LeRobot 官方自己公开的 <code>lerobot/diffusion_pusht</code> 训练日志放在一起看，才发现这个直觉是错的。官方训练的 loss 同样在 2 万到 3 万个 step 左右就基本走平，之后一直到 12 万步都稳定在 0.01～0.03 这个区间，几乎没有肉眼可见的进一步下降。但把同一批 checkpoint 拿去做 rollout 评估，success rate 在 loss 完全看不出变化的这十几万步里，从 10k 步时的 12% 一路爬升到 150k～200k 步时稳定在 60%～74% 的区间，中间还有不小的波动（比如 120k 步一度回落到 58%）。</p>
+<p>这说明 <code>train/loss</code> 衡量的是”预测噪声这个局部回归任务准不准”，网络很快就能学到这一点；而 success rate 衡量的是”整段去噪迭代 + receding horizon 闭环执行之后，动作序列能不能真正完成任务”，这是一个粒度完全不同、收敛速度也慢得多的信号。loss 走平不代表策略行为已经收敛，这是这次核实过程里最有价值的一个纠偏。</p>
+<p><strong>再看训练配置本身的差距。</strong> 把自己的训练命令行和官方仓库里公开的 <code>train_config.json</code> 逐项核对之后，发现的差距比之前预估的更大：</p>
 <ul>
-<li><strong>Encoding</strong>: input sensor data → BEV feature</li>
-<li><strong>Compression</strong>: BEV feature → compressed BEV feature</li>
+<li><strong>batch_size</strong>：官方配置是 <code>64</code>。而这次实验的训练命令里没有单独指定这个参数，走的是框架默认值——经核实后确认默认值是 <code>8</code>，而不是最初以为的 <code>32</code>。同样的 step 数下，实际处理的数据量差距被严重低估了：<code>80000 步 × batch_size 8 ≈ 64 万条样本</code>，相比官方 <code>200000 步 × batch_size 64 ≈ 1280 万条样本</code>，实际训练量大约只有官方的 **5%**，而不是最初粗算的 20%。</li>
+<li><strong>steps</strong>：这次实验只训到了 80000 步左右，是官方 200000 步目标的 40%，叠加上面 batch_size 的差距，两者共同作用后差距被明显放大。</li>
+<li><strong>图像增强和 EMA</strong>：这是最反直觉的一处核实结果。最初设想的排查方向是”官方大概率开了这两项，而这次实验没开，所以有差距”——但直接查证官方 <code>train_config.json</code> 后发现完全相反：<code>image_transforms.enable</code> 字段的值是 <code>false</code>，官方基准训练时图像增强其实是关闭的；配置文件里也完全没有 <code>use_ema</code> 或同类字段，说明这个官方基准模型本身没有使用 EMA。也就是说，这两项此前设想中的”待核实差距”根本不存在，真正的差距完全集中在 batch_size 和 steps 这两项数据吞吐量相关的参数上。</li>
 </ul>
-<p>📢 broadcasting compressed BEV feature to other agents in range δ</p>
-<p>📬 receiving other BEV features from other agents</p>
-<ul>
-<li><strong>Decompression</strong>: compressed BEV feature from j → BEV feature j (using decompressor i)</li>
-<li><strong>Fusion</strong>: all BEV features in range δ → new BEV feature i</li>
-<li><strong>Decoding</strong>: new BEV feature i → output i</li>
+<p>这个核实过程带来一个实际的方法论提醒：<strong>排查训练差距时，”猜测官方用了更复杂的技巧”是一种容易走的弯路，直接去查官方公开的配置文件，往往比凭直觉补全设置更可靠、也更省时间。</strong></p>
+<p>基于这个核实结果，目前正在做的是：把 batch_size 改成 64、steps 目标改成 200000，图像增强和 EMA 都保持关闭（对齐官方而不是过度设计），重新训练 baseline 和接触版本。由于中途在 100k 步左右保存过 checkpoint，训练是通过 LeRobot 的 <code>--resume=true</code> 机制在原有 optimizer 状态和数据读取顺序基础上继续跑向 200k，而不是从头重新训练。</p>
+<h2 id="九、100k-步节点的阶段性评估：为什么现在还不能下结论"><a href="#九、100k-步节点的阶段性评估：为什么现在还不能下结论" class="headerlink" title="九、100k 步节点的阶段性评估：为什么现在还不能下结论"></a>九、100k 步节点的阶段性评估：为什么现在还不能下结论</h2><p>在等待训练跑满 200000 步的过程中，用当前 100k 步左右的 checkpoint 各做了一轮阶段性评估，权当中途检查点，而不是最终结论。</p>
+<p>两组独立评估的结果如下（成功率 &#x2F; avg_reward）：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>baseline</th>
+<th>contact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>n&#x3D;100</td>
+<td>37% (37&#x2F;100), avg_reward 116.39</td>
+<td>37% (37&#x2F;100), avg_reward 109.25</td>
+</tr>
+<tr>
+<td>n&#x3D;50</td>
+<td>42% (21&#x2F;50), avg_reward 110.68</td>
+<td>28% (14&#x2F;50), avg_reward 120.30</td>
+</tr>
+</tbody></table>
+<p>单看数字会觉得有点矛盾：第一组两者成功率打平，但 baseline 的 avg_reward 更高；第二组 success_rate 上 baseline 明显领先，avg_reward 却反过来是 contact 更高。把这几组数字换算成 Beta 后验区间就能看清这个”矛盾”是怎么回事：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">baseline (n=100): 点估计 0.37，95% 区间 [0.28, 0.47]</span><br><span class="line">contact  (n=100): 点估计 0.37，95% 区间 [0.28, 0.47]</span><br><span class="line">baseline (n=50):  点估计 0.42，95% 区间 [0.29, 0.56]</span><br><span class="line">contact  (n=50):  点估计 0.28，95% 区间 [0.17, 0.42]</span><br></pre></td></tr></table></figure>
+
+<p>即使把两次评估合并成一组 150 episode 的估计，baseline 的区间是 <code>[0.31, 0.47]</code>，contact 的区间是 <code>[0.27, 0.42]</code>，两者依然有大段重叠（0.31～0.42）。这个重叠意味着，现有数据完全不足以说明这两个模型之间存在真实差异——两组数字之间”谁更好”的摇摆，本质上就是小样本噪声的正常表现，而不是接触先验在起作用或者起反作用的信号。</p>
+<p>这个结果本身并不意外，反而印证了第八节的核实结论：100k 步、batch_size 64 的这一轮，仍然只是刚好达到官方训练量的一半左右（<code>100000 × 64 = 640万</code> vs 官方 <code>1280万</code>），而且从第八节官方曲线里 100k～150k 这个区间的 success rate 走势看，这正是数值本身仍在波动上升、还没有完全稳定下来的阶段。在这个训练进度上做出”两者有没有差异”的结论，为时尚早。</p>
+<p>真正能拿来做决定性对比的评估，需要等训练跑到 200000 步附近再进行——那时候两个模型的能力上限才真正对齐了官方验证过的训练规模，观察到的差异（如果有的话）才更有可能反映接触先验本身的效果，而不是训练本身还没收敛这个更大的干扰因素。</p>
+<h2 id="十、目前能负责任地说什么"><a href="#十、目前能负责任地说什么" class="headerlink" title="十、目前能负责任地说什么"></a>十、目前能负责任地说什么</h2><p>工程链路是完整且可复用的：数据构建、维度扩展、在线一致性接入、评估协议设计这几块都经受住了检验，也梳理清楚了一套具体可操作的评估方法论（Beta 后验区间判断重叠、区分训练 seed 和评估 seed 的不同作用、success_rate 和 avg_reward 互相印证）。</p>
+<p>不能说的是接触先验是否真的有效。100k 步节点的阶段性结果显示两者的表现区间大幅重叠，但这个节点本身的训练规模还没有对齐官方验证过的设置，不足以把”接触先验有没有用”这个问题从”训练本身是否收敛”这个更大的干扰因素里剥离出来。</p>
+<p>这和最初设想的”跑几组对比就能有答案”不一样，但把这个边界看清楚——包括中途纠正了对 loss 曲线、对官方训练配置的两处误判——本身也是这次实验里最有价值的产出之一。</p>
+<h2 id="十一、后续方向"><a href="#十一、后续方向" class="headerlink" title="十一、后续方向"></a>十一、后续方向</h2><ul>
+<li>等 baseline 和接触版本都训练到 200000 步附近，用固定的一组评估 seed（更大样本量，比如 200～500 episode）重新做一轮对比，这次的结果才具备下结论的资格。</li>
+<li>把二值接触信号换成连续距离或者软阈值形式，保留更多几何信息，也降低阈值本身设定是否合理这个额外的不确定因素。</li>
+<li>在多个训练 checkpoint（比如 20k、50k、100k、150k、200k）上用同一组 seed 做评估，画出样本效率曲线，直接回答”是否学得更快”而不只是”最终是否更好”这个问题——第八节里官方曲线本身波动不小，接触先验会不会让这条曲线更平滑、更早收敛，也是一个值得单独观察的维度。</li>
+<li>探讨这个几何代理信号和真实触觉传感器读数之间的差距，为以后往真实触觉信号迁移做准备。</li>
 </ul>
-<h1 id="STAMP框架"><a href="#STAMP框架" class="headerlink" title="STAMP框架"></a>STAMP框架</h1><p>用adaptation和reversion替代compression和decompression</p>
-<p>即设计adapter和reverter</p>
-<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" /></center>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" /></center>
-
-<ul>
-<li>…</li>
-<li><strong>Adaptation</strong>: local BEV feature i → protocol feature i (BEV)</li>
-</ul>
-<p>📢 broadcasting protocol feature to other agents in range δ</p>
-<p>📬 receiving other protocol features from other agents</p>
-<ul>
-<li><strong>Reversion</strong>: other protocol features → reverted protocol features</li>
-<li><strong>Fusion</strong>: reverted protocol features + locol BEV feature i → new BEV feature i</li>
-<li>…</li>
-</ul>
-<p>STAMP支持不同<strong>模态modality</strong>(eg. m1 m2 …)、<strong>模型架构model_architecture</strong>(eg. Encoder: Resnet101 EfficientNet)和<strong>下游任务downstream_task</strong>的代理。</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:550px" /></center>
-
-<h1 id="协同特征对齐模块（CFA）"><a href="#协同特征对齐模块（CFA）" class="headerlink" title="协同特征对齐模块（CFA）"></a>协同特征对齐模块（CFA）</h1><p>CFA：用来训练统一的BEV feature表示和每个代理的adapter-reverter对</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:500px" /></center>
-
-<h2 id="CFA训练流程："><a href="#CFA训练流程：" class="headerlink" title="CFA训练流程："></a>CFA训练流程：</h2><ol>
-<li><p>训练 protocol network</p>
-<p> 与传统CP流程类似</p>
-<p> protocol encoder: Ep</p>
-<p> (compressor and decompressor为恒等函数 即输入&#x3D;输出)</p>
-<p> protocol fusion model: Up</p>
-<p> protocol decoder: Dp</p>
-</li>
-<li><p>训练 local adapter-reverters</p>
-<p> Τ（模态变换函数）: Χ（周围环境状态） → I（输入数据）</p>
-<p> Ti是local model的传感器模态，Tp是protocol model的传感器模态。二者分别把传感器信息转化成Ii和Ip给Ei和Ep，再转化为Fi和Fp。</p>
-<p> 因此adapter的作用是填补T和E叠加出的domian gap，其训练的目标函数即Fp与Φi(Fi)的特征对齐损失。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" /></center>
- 
-<p> 对应地，reverter的目标函数可为Ψi(Fp)与Fi的特征对齐损失。而本文在此基础上增加了一个额外监督，即Ψi(Fp)与Ψi(Φi(Fi))的特征对齐损失。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" /></center>
- 
-<p> 对于这个“特征对齐”，将在特征空间和决策空间两处进行。</p>
-</li>
-<li><p>特征空间对齐</p>
-<p> 用L2-norm对齐Fp与Φi(Fi)、Ψi(Fp)与Fi、Ψi(Fp)与Ψi(Φi(Fi))。</p>
-<p> 共K个周围环境状态，因此共K组3对特征对</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" /></center>
- </li>
-<li><p>决策空间对齐</p>
-<p> 此处损失函数是针对下游任务设计的，有local和protocol版本。GT为ground truth labels。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" /></center>
-
-<p> 在此基础上加入权重，总损失函数如下：</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></center></li>
-</ol>
-<h1 id="adapter和reverter的结构"><a href="#adapter和reverter的结构" class="headerlink" title="adapter和reverter的结构"></a>adapter和reverter的结构</h1><p>domian gap三大来源：空间分辨率、feature patterns、通道尺寸。</p>
-<p>空间分辨率：采用简单的线性插值进行对齐</p>
-<p>feature patterns：用三个具有隐藏通道维度Chidden的ConvNeXt层对齐</p>
-<p>通道尺寸：用两个额外的卷积层对齐</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB%2019544705762780068f19d6e1d2c5bfec/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" /></center>]]></content>
+]]></content>
       <categories>
-        <category>论文笔记</category>
+        <category>项目笔记</category>
       </categories>
       <tags>
-        <tag>paper</tag>
-        <tag>collaborative perception</tag>
+        <tag>VLA</tag>
+        <tag>具身智能</tag>
+        <tag>DiffusionPolicy</tag>
       </tags>
   </entry>
 </search>
