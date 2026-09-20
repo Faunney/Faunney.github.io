@@ -43,7 +43,7 @@
 <ul>
 <li>基本框架：观测 (O &#x3D; V + L) -&gt; 动作 (A)</li>
 <li>输入为机器人视觉传感器数据和语言指令</li>
-<li>输出为机器人动作序列（关节角度&#x2F;末端为姿等）</li>
+<li>输出为机器人动作序列（关节角度&#x2F;末端位姿等）</li>
 </ul>
 </li>
 <li><p><strong>VTLA（Vision-Tactile-Language-Action）</strong></p>
@@ -189,7 +189,7 @@
 <li><p><strong>跨传感器数据归一化</strong></p>
 </li>
 </ul>
-<h2 id="近期工作"><a href="#近期工作" class="headerlink" title="近期工作"></a>近期工作</h2><h3 id="OmniVTLA（如何把Tactil表征得更像VL语义）"><a href="#OmniVTLA（如何把Tactil表征得更像VL语义）" class="headerlink" title="OmniVTLA（如何把Tactil表征得更像VL语义）"></a>OmniVTLA（如何把Tactil表征得更像VL语义）</h3><center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/OmniVTLA.png" style="height:400px" /></center>
+<h2 id="近期工作"><a href="#近期工作" class="headerlink" title="近期工作"></a>近期工作</h2><h3 id="OmniVTLA（如何把Tactil表征得更像VL语义）"><a href="#OmniVTLA（如何把Tactil表征得更像VL语义）" class="headerlink" title="OmniVTLA（如何把Tactil表征得更像VL语义）"></a>OmniVTLA（如何把Tactil表征得更像VL语义）</h3><center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/OmniVTLA.png" style="height:350px" /></center>
 
 <ul>
 <li><strong>数据处理</strong>：搭建ObjTac数据集，用视觉&#x2F;语言给 force-based tactile 建立语义监督，即针对不同物体对齐VTL信息。具体流程：采力、采视频、打语言标签（包含物体多方面特征）、对齐时间戳、得到物体VTL三模态对齐数据</li>
@@ -200,7 +200,7 @@
 </li>
 <li>VLA backbone接收的五路输入：Language tokens、encoded image、tactile → 普通 ViT → tactile features、tactile → SA-ViT → VL-aligned tactile features（为了让模型更好地适应触觉信息）、robot state &#x2F; proprioception</li>
 </ul>
-<h3 id="Tactile-VLA"><a href="#Tactile-VLA" class="headerlink" title="Tactile-VLA"></a>Tactile-VLA</h3><center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/Tactile-VLA.png" style="height:400px" /></center>
+<h3 id="Tactile-VLA"><a href="#Tactile-VLA" class="headerlink" title="Tactile-VLA"></a>Tactile-VLA</h3><center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/Tactile-VLA.png" style="height:350px" /></center>
 
 <ul>
 <li><strong>数据处理</strong>：直接采机器人数据，用带双触觉传感器和相机的UMI采集器，同时记录视觉、触觉、语言指令、proprioception和expert action。</li>
@@ -215,7 +215,7 @@
 </ul>
 </li>
 </ul>
-<h3 id="Drean-Tac"><a href="#Drean-Tac" class="headerlink" title="Drean-Tac"></a>Drean-Tac</h3><center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/Dream-Tac.png" style="height:400px" /></center>]]></content>
+<h3 id="Drean-Tac"><a href="#Drean-Tac" class="headerlink" title="Drean-Tac"></a>Drean-Tac</h3><center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/Dream-Tac.png" style="height:350px" /></center>]]></content>
       <categories>
         <category>学习笔记</category>
       </categories>
@@ -312,7 +312,7 @@
     <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
     <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
 <p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
-<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt install tmux	<span class="comment">#Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment">#CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment">#MacOS</span></span><br></pre></td></tr></table></figure>
+<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">apt update &amp;&amp; apt install -y sudo   <span class="comment"># 安装sudo</span></span><br><span class="line">sudo apt install tmux	<span class="comment"># Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment"># CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment"># MacOS</span></span><br></pre></td></tr></table></figure>
 <h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
 <h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
 <h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
@@ -822,13 +822,13 @@ $$ -->
 <td align="right"><strong>+0.0585</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#x63;&#99;&#x40;&#48;&#x2e;&#50;&#53;">&#65;&#x63;&#99;&#x40;&#48;&#x2e;&#50;&#53;</a></td>
+<td><a href="mailto:&#65;&#99;&#99;&#64;&#x30;&#46;&#50;&#x35;">&#65;&#99;&#99;&#64;&#x30;&#46;&#50;&#x35;</a></td>
 <td align="right">0.2958</td>
 <td align="right"><strong>0.3662</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#99;&#x63;&#x40;&#48;&#46;&#x35;">&#x41;&#99;&#x63;&#x40;&#48;&#46;&#x35;</a></td>
+<td><a href="mailto:&#x41;&#x63;&#99;&#64;&#48;&#46;&#x35;">&#x41;&#x63;&#99;&#64;&#48;&#46;&#x35;</a></td>
 <td align="right">0.1690</td>
 <td align="right"><strong>0.2394</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
@@ -892,13 +892,13 @@ $$ -->
 <td align="right"><strong>0.3379</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#99;&#x63;&#x40;&#48;&#x2e;&#x32;&#x35;">&#x41;&#99;&#x63;&#x40;&#48;&#x2e;&#x32;&#x35;</a></td>
+<td><a href="mailto:&#65;&#99;&#x63;&#64;&#48;&#46;&#x32;&#x35;">&#65;&#99;&#x63;&#64;&#48;&#46;&#x32;&#x35;</a></td>
 <td align="right">0.2958</td>
 <td align="right">0.3662</td>
 <td align="right"><strong>0.4648</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#99;&#x63;&#x40;&#x30;&#x2e;&#53;">&#x41;&#99;&#x63;&#x40;&#x30;&#x2e;&#53;</a></td>
+<td><a href="mailto:&#65;&#99;&#99;&#x40;&#48;&#46;&#x35;">&#65;&#99;&#99;&#x40;&#48;&#46;&#x35;</a></td>
 <td align="right">0.1690</td>
 <td align="right">0.2394</td>
 <td align="right"><strong>0.3803</strong></td>
@@ -914,8 +914,8 @@ $$ -->
 <th>train</th>
 <th>render</th>
 <th align="right">mIoU</th>
-<th align="right"><a href="mailto:&#x41;&#99;&#x63;&#x40;&#48;&#46;&#50;&#x35;">&#x41;&#99;&#x63;&#x40;&#48;&#46;&#50;&#x35;</a></th>
-<th align="right"><a href="mailto:&#65;&#99;&#99;&#x40;&#48;&#x2e;&#53;">&#65;&#99;&#99;&#x40;&#48;&#x2e;&#53;</a></th>
+<th align="right"><a href="mailto:&#x41;&#99;&#x63;&#x40;&#48;&#46;&#x32;&#53;">&#x41;&#99;&#x63;&#x40;&#48;&#46;&#x32;&#53;</a></th>
+<th align="right"><a href="mailto:&#x41;&#x63;&#99;&#64;&#x30;&#x2e;&#53;">&#x41;&#x63;&#99;&#64;&#x30;&#x2e;&#53;</a></th>
 </tr>
 </thead>
 <tbody><tr>
