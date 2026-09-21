@@ -309,8 +309,29 @@
   </entry>
   <entry>
     <title>【工具】git基本使用</title>
-    <url>/2025/09/21/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91git%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
-    <content><![CDATA[<h3 id="一、新项目第一次上传（只做一次）"><a href="#一、新项目第一次上传（只做一次）" class="headerlink" title="一、新项目第一次上传（只做一次）"></a>一、新项目第一次上传（只做一次）</h3><ol>
+    <url>/2025/04/21/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91git%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h3 id="零、分类：我的工作和官方代码是什么关系？"><a href="#零、分类：我的工作和官方代码是什么关系？" class="headerlink" title="零、分类：我的工作和官方代码是什么关系？"></a>零、分类：我的工作和官方代码是什么关系？</h3><table>
+<thead>
+<tr>
+<th>情况</th>
+<th>做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>只写了<strong>新文件</strong>，没动官方代码</td>
+<td>建<strong>独立仓库</strong>，README 写明依赖的官方版本（第一、二节）</td>
+</tr>
+<tr>
+<td><strong>改了官方文件</strong>（新增 config、改源码）</td>
+<td><strong>fork 官方仓库</strong>，在自己的分支上改（第三节）</td>
+</tr>
+<tr>
+<td>改了官方文件，但只想发布改动部分</td>
+<td>导出 <strong>patch</strong>（第四节，可选）</td>
+</tr>
+</tbody></table>
+<p>三者解决的是同一个问题：把”我的工作”和”官方代码”一起交代清楚。fork 里每一个 commit 本身就相当于一份 patch，GitHub 上点 Compare 就能看到相对官方的全部改动，所以通常 fork 比 patch 省事。</p>
+<h3 id="一、新项目第一次上传（独立仓库，只做一次）"><a href="#一、新项目第一次上传（独立仓库，只做一次）" class="headerlink" title="一、新项目第一次上传（独立仓库，只做一次）"></a>一、新项目第一次上传（独立仓库，只做一次）</h3><ol>
 <li>在 github.com 点 New repository，起名，选 Public，<strong>不要</strong>勾选自动生成 README &#x2F; .gitignore &#x2F; license（本地已有内容时勾了会冲突）。</li>
 <li>本地进入项目文件夹，依次执行：</li>
 </ol>
@@ -320,21 +341,73 @@
 <h3 id="二、日常更新（常用）"><a href="#二、日常更新（常用）" class="headerlink" title="二、日常更新（常用）"></a>二、日常更新（常用）</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git status                      <span class="comment"># 看改了什么</span></span><br><span class="line">git add .                       <span class="comment"># 全部加入暂存（或 git add 文件名 只加某个文件）</span></span><br><span class="line">git commit -m <span class="string">&quot;简短说明这次改了什么&quot;</span></span><br><span class="line">git push</span><br></pre></td></tr></table></figure>
 
 <p>想成”改文件 → add → commit → push”四步循环。commit 在本地存快照，push 才会上传到 GitHub。</p>
-<h3 id="三、几个容易踩的点"><a href="#三、几个容易踩的点" class="headerlink" title="三、几个容易踩的点"></a>三、几个容易踩的点</h3><ul>
-<li><strong>先 <code>git status</code> 再 commit</strong>：绿色是已暂存，红色是没加上的，未跟踪文件要 add 才会进去。你这次的空提交就是漏了这一步。</li>
+<h3 id="三、改了官方代码：用-fork（以-openpi-为例）"><a href="#三、改了官方代码：用-fork（以-openpi-为例）" class="headerlink" title="三、改了官方代码：用 fork（以 openpi 为例）"></a>三、改了官方代码：用 fork（以 openpi 为例）</h3><p><strong>fork</strong> 是 GitHub 上把别人的仓库完整复制一份到自己账号下的功能。副本是独立的，有完整写权限，同时 GitHub 记得它来自哪里，可以随时对比”我比官方多了什么”。</p>
+<p><strong>流程和第一、二节是同一套 <code>add / commit / push</code>，只多两步：点 Fork、改 remote。</strong></p>
+<ol>
+<li>在官方仓库页面右上角点 <strong>Fork</strong>，得到 <code>github.com/Faunney/openpi</code>。</li>
+<li>如果代码已经在服务器上（从官方 clone 的），把远端改成指向自己的 fork：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">cd</span> openpi</span><br><span class="line">git status                      <span class="comment"># 先看改了哪些文件</span></span><br><span class="line">git remote -v                   <span class="comment"># 一般 origin 是官方地址</span></span><br><span class="line">git remote rename origin upstream      <span class="comment"># 官方地址改名为 upstream，留着以后同步</span></span><br><span class="line">git remote add origin https://github.com/Faunney/openpi.git</span><br><span class="line">git checkout -b lora-rank-ablation     <span class="comment"># 在独立分支上改，不动 main</span></span><br><span class="line">git add 文件1 文件2                     <span class="comment"># 只 add 自己改的文件，别用 git add .</span></span><br><span class="line">git status</span><br><span class="line">git commit -m <span class="string">&quot;Add pi0.5 LoRA rank variants and freeze SigLIP&quot;</span></span><br><span class="line">git push -u origin lora-rank-ablation</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>如果还没 clone，直接 clone 自己的 fork 即可：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">clone</span> https://github.com/Faunney/openpi.git</span><br><span class="line"><span class="built_in">cd</span> openpi</span><br><span class="line">git remote add upstream https://github.com/官方组织/openpi.git</span><br></pre></td></tr></table></figure>
+
+<ol start="4">
+<li>想拿到官方后续更新：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git fetch upstream</span><br><span class="line">git merge upstream/main         <span class="comment"># 在你的分支上合并官方更新，有冲突就手动解决</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>要点</strong></p>
+<ul>
+<li><code>origin</code> &#x3D; 我的 fork（能推送），<code>upstream</code> &#x3D; 官方仓库（只读）。</li>
+<li>改动放在单独分支，<code>main</code> 保持和官方一致，出问题好回退。</li>
+<li>权重、norm stats、checkpoints、wandb 目录一律不进仓库，<code>git add</code> 前先 <code>git status</code>。</li>
+<li>子模块（如 openpi 里的第三方依赖）不要手动改，fork 时不用管。</li>
+<li>每完成一小块（config、统计脚本、试跑日志）就 commit + push 一次，既是备份，也是持续工作的记录。</li>
+</ul>
+<h3 id="四、patch（可选）"><a href="#四、patch（可选）" class="headerlink" title="四、patch（可选）"></a>四、patch（可选）</h3><p>patch 是一个文本文件，记录”相对某个基准版本改了哪些行”，别人拿到官方代码后一条命令就能套上：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 导出：在改完的仓库里</span></span><br><span class="line">git diff &gt; my_changes.patch             <span class="comment"># 未提交的改动</span></span><br><span class="line">git format-patch -1                     <span class="comment"># 最近一次已提交的改动</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 复现：在官方代码副本里</span></span><br><span class="line">git apply my_changes.patch</span><br></pre></td></tr></table></figure>
+
+<p>适用于：只想分享改动、不想 fork 整个仓库的情况。<strong>如果你根本没改官方文件（比如 DP 那个项目），就没有可以打 patch 的东西。</strong></p>
+<h3 id="五、几个容易踩的点"><a href="#五、几个容易踩的点" class="headerlink" title="五、几个容易踩的点"></a>五、几个容易踩的点</h3><ul>
+<li><strong>先 <code>git status</code> 再 commit</strong>：绿色是已暂存，红色是没加上的，未跟踪文件要 add 才会进去。</li>
 <li><strong>commit 信息写清楚</strong>：比如 <code>Add README</code>、<code>Replace hardcoded paths with CLI args</code>、<code>Add eval results</code>，别全写 update。一个 commit 做一件事，记录会好看很多。</li>
 <li><strong><code>.gitignore</code> 第一次就建好</strong>：放不想上传的东西，比如：<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">*.npy</span><br><span class="line">*.pt</span><br><span class="line">*.safetensors</span><br><span class="line">checkpoints/</span><br><span class="line">outputs/</span><br><span class="line">wandb/</span><br><span class="line">__pycache__/</span><br><span class="line">.env</span><br></pre></td></tr></table></figure>
 注意 <code>.gitignore</code> 对已经提交过的文件不起作用，要先 <code>git rm --cached 文件名</code>。</li>
 <li><strong>别提交大文件和密钥</strong>：权重、数据集、API key（wandb、HuggingFace token）一律不进仓库。GitHub 单文件超过 100MB 会直接拒绝。密钥一旦推上去，即使删了也在历史里，需要作废重新生成。</li>
 <li><strong>推之前先拉</strong>：如果你在网页上直接改过文件（比如在 GitHub 上编辑了 README），本地推送会被拒绝，先 <code>git pull</code> 再 <code>git push</code>。</li>
+<li><strong>路径别写死</strong>：脚本里的 <code>/root/...</code>、checkpoint 路径改成顶部变量或命令行参数，README 里说明怎么改。</li>
+<li><strong>服务器释放前先推送</strong>：实例释放后本地文件就没了，哪怕项目没做完，也先把代码和结果日志推上去。</li>
 </ul>
-<h3 id="四、几个偶尔有用的命令"><a href="#四、几个偶尔有用的命令" class="headerlink" title="四、几个偶尔有用的命令"></a>四、几个偶尔有用的命令</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">log</span> --oneline               <span class="comment"># 看提交历史</span></span><br><span class="line">git diff                        <span class="comment"># 看还没 add 的改动</span></span><br><span class="line">git remote -v                   <span class="comment"># 看远端地址</span></span><br><span class="line">git restore 文件名               <span class="comment"># 丢弃某个文件的未提交改动（慎用）</span></span><br><span class="line">git <span class="built_in">clone</span> 仓库地址               <span class="comment"># 把别人的或自己的仓库下载到本地</span></span><br></pre></td></tr></table></figure>]]></content>
+<h3 id="六、几个偶尔有用的命令"><a href="#六、几个偶尔有用的命令" class="headerlink" title="六、几个偶尔有用的命令"></a>六、几个偶尔有用的命令</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">log</span> --oneline               <span class="comment"># 看提交历史</span></span><br><span class="line">git diff                        <span class="comment"># 看还没 add 的改动</span></span><br><span class="line">git remote -v                   <span class="comment"># 看远端地址</span></span><br><span class="line">git branch                      <span class="comment"># 看当前在哪个分支</span></span><br><span class="line">git restore 文件名               <span class="comment"># 丢弃某个文件的未提交改动（慎用）</span></span><br><span class="line">git <span class="built_in">clone</span> 仓库地址               <span class="comment"># 把别人的或自己的仓库下载到本地</span></span><br></pre></td></tr></table></figure>]]></content>
       <categories>
         <category>工具</category>
       </categories>
       <tags>
         <tag>git</tag>
         <tag>github</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【工具】tmux基本使用</title>
+    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
+<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
+<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">apt update &amp;&amp; apt install -y sudo   <span class="comment"># 安装sudo</span></span><br><span class="line">sudo apt install tmux	<span class="comment"># Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment"># CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment"># MacOS</span></span><br></pre></td></tr></table></figure>
+<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
+<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
+<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="6-设置tmux进入鼠标模式，即可使用滚轮翻看历史"><a href="#6-设置tmux进入鼠标模式，即可使用滚轮翻看历史" class="headerlink" title="6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史"></a>6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">set</span> -g mouse on</span><br><span class="line"></span><br><span class="line">tmux <span class="built_in">set</span> -g mouse off</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>工具</category>
+      </categories>
+      <tags>
+        <tag>linux</tag>
+        <tag>tmux</tag>
       </tags>
   </entry>
   <entry>
@@ -394,26 +467,6 @@
       <tags>
         <tag>Prompt Engineering</tag>
         <tag>summer camp</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【工具】tmux基本使用</title>
-    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
-    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
-<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
-<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">apt update &amp;&amp; apt install -y sudo   <span class="comment"># 安装sudo</span></span><br><span class="line">sudo apt install tmux	<span class="comment"># Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment"># CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment"># MacOS</span></span><br></pre></td></tr></table></figure>
-<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
-<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
-<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="6-设置tmux进入鼠标模式，即可使用滚轮翻看历史"><a href="#6-设置tmux进入鼠标模式，即可使用滚轮翻看历史" class="headerlink" title="6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史"></a>6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">set</span> -g mouse on</span><br><span class="line"></span><br><span class="line">tmux <span class="built_in">set</span> -g mouse off</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>工具</category>
-      </categories>
-      <tags>
-        <tag>linux</tag>
-        <tag>tmux</tag>
       </tags>
   </entry>
   <entry>
@@ -852,13 +905,13 @@ $$ -->
 <td align="right"><strong>+0.0585</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#x63;&#x40;&#x30;&#x2e;&#x32;&#x35;">&#65;&#99;&#x63;&#x40;&#x30;&#x2e;&#x32;&#x35;</a></td>
+<td><a href="mailto:&#x41;&#99;&#99;&#x40;&#x30;&#46;&#50;&#x35;">&#x41;&#99;&#99;&#x40;&#x30;&#46;&#50;&#x35;</a></td>
 <td align="right">0.2958</td>
 <td align="right"><strong>0.3662</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#x63;&#99;&#x40;&#x30;&#x2e;&#x35;">&#65;&#x63;&#99;&#x40;&#x30;&#x2e;&#x35;</a></td>
+<td><a href="mailto:&#x41;&#x63;&#x63;&#x40;&#48;&#x2e;&#53;">&#x41;&#x63;&#x63;&#x40;&#48;&#x2e;&#53;</a></td>
 <td align="right">0.1690</td>
 <td align="right"><strong>0.2394</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
@@ -922,13 +975,13 @@ $$ -->
 <td align="right"><strong>0.3379</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#x63;&#99;&#x40;&#48;&#x2e;&#50;&#53;">&#x41;&#x63;&#99;&#x40;&#48;&#x2e;&#50;&#53;</a></td>
+<td><a href="mailto:&#65;&#x63;&#x63;&#x40;&#48;&#x2e;&#50;&#x35;">&#65;&#x63;&#x63;&#x40;&#48;&#x2e;&#50;&#x35;</a></td>
 <td align="right">0.2958</td>
 <td align="right">0.3662</td>
 <td align="right"><strong>0.4648</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#99;&#x40;&#x30;&#46;&#x35;">&#65;&#99;&#99;&#x40;&#x30;&#46;&#x35;</a></td>
+<td><a href="mailto:&#x41;&#99;&#x63;&#x40;&#48;&#46;&#53;">&#x41;&#99;&#x63;&#x40;&#48;&#46;&#53;</a></td>
 <td align="right">0.1690</td>
 <td align="right">0.2394</td>
 <td align="right"><strong>0.3803</strong></td>
@@ -944,8 +997,8 @@ $$ -->
 <th>train</th>
 <th>render</th>
 <th align="right">mIoU</th>
-<th align="right"><a href="mailto:&#65;&#99;&#x63;&#x40;&#48;&#x2e;&#x32;&#53;">&#65;&#99;&#x63;&#x40;&#48;&#x2e;&#x32;&#53;</a></th>
-<th align="right"><a href="mailto:&#65;&#99;&#99;&#64;&#48;&#46;&#x35;">&#65;&#99;&#99;&#64;&#48;&#46;&#x35;</a></th>
+<th align="right"><a href="mailto:&#x41;&#x63;&#x63;&#64;&#48;&#x2e;&#50;&#53;">&#x41;&#x63;&#x63;&#64;&#48;&#x2e;&#50;&#53;</a></th>
+<th align="right"><a href="mailto:&#65;&#99;&#x63;&#x40;&#x30;&#x2e;&#x35;">&#65;&#99;&#x63;&#x40;&#x30;&#x2e;&#x35;</a></th>
 </tr>
 </thead>
 <tbody><tr>
