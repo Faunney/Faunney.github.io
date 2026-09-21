@@ -1,6 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>【学习笔记】训练与评估</title>
+    <url>/2026/09/15/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/</url>
+    <content><![CDATA[<h2 id="1-模型与优化（Optimization）"><a href="#1-模型与优化（Optimization）" class="headerlink" title="1. 模型与优化（Optimization）"></a>1. 模型与优化（Optimization）</h2><h3 id="EMA（指数移动平均）"><a href="#EMA（指数移动平均）" class="headerlink" title="EMA（指数移动平均）"></a>EMA（指数移动平均）</h3><p><strong>定义</strong>：训练时除了梯度下降正常更新的参数 <code>θ_t</code>，额外维护一份影子参数 <code>θ_shadow</code>，它跟着真实参数走，但更新得更慢，不参与反向传播，只是被动更新：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">θ_shadow = decay * θ_shadow + (<span class="number">1</span> - decay) * θ_t</span><br></pre></td></tr></table></figure>
+
+<p><code>decay</code> 一般取 0.999。</p>
+<p><strong>为什么重要</strong>：eval 时用 <code>θ_shadow</code> 通常比用最后一步的 <code>θ_t</code> 更稳定、泛化更好，因为 shadow 参数相当于把训练后期的参数抖动做了平均。</p>
+<p><strong>踩过的坑</strong>：最初以为 <code>use_ema</code> 是可选的性能优化，后来发现有的官方基准（比如 lerobot&#x2F;diffusion_pusht）反而没开这个选项，说明它不是”越复杂越好”，要看具体基准配置。</p>
+<p><strong>关联概念</strong>：<code>batch_size</code>（同样影响训练稳定性）、图像增强（同样服务于泛化）</p>
+<hr>
+<h3 id="batch-size-批次大小"><a href="#batch-size-批次大小" class="headerlink" title="batch size (批次大小)"></a>batch size (批次大小)</h3><p><strong>定义</strong>：模型每处理完一个 batch（一批样本）就计算一次梯度、更新一次参数，这批样本的数量就是 <code>batch size</code>。它决定了每次参数更新时，梯度是基于多少个样本的信息综合出来的。</p>
+<p><strong>为什么重要</strong>：<code>batch size</code> 越大，单次梯度估计包含的样本信息越多、噪声越小，梯度方向更稳定，同样步数下往往能达到更好的效果；但代价是显存占用随 <code>batch size</code> 线性增长，过大会直接导致 OOM。另外 <code>batch size</code> 和学习率不是独立的——<code>batch size</code> 变大后梯度噪声变小，通常需要相应调大学习率（linear scaling rule），否则同样的学习率会显得”步子迈得太小”，收敛变慢。</p>
+<p><strong>踩过的坑</strong>：如果目标是复现某个 baseline，<code>batch size</code> 必须和原始设置对齐，而不能只对齐 <code>steps</code> 数——因为两者共同决定了模型实际”看过”多少样本（有效训练量 ≈ <code>batch_size × steps</code>）。</p>
+<p><strong>关联概念</strong>：EMA（<code>batch size</code> 影响梯度噪声，间接影响 shadow 参数的平滑效果是否必要）、学习率调度（<code>batch size</code> 变化时学习率通常要联动调整）</p>
+<hr>
+<h3 id="学习率调度（warmup、cosine-decay…）"><a href="#学习率调度（warmup、cosine-decay…）" class="headerlink" title="学习率调度（warmup、cosine decay…）"></a>学习率调度（warmup、cosine decay…）</h3><p><strong>定义</strong>：动态调整学习率。最常见的组合是「warmup + cosine decay」：训练最初的若干步，学习率从一个很小的值线性增长到设定的峰值（warmup）；之后再按余弦函数的形状，从峰值逐渐衰减到接近 0（cosine decay）。</p>
+<p><strong>为什么重要</strong>：训练刚开始时参数是随机初始化的，梯度方向往往很不准，如果一上来就用较大的学习率，容易在初期就把参数带偏甚至训练发散，所以需要 warmup 先”热身”；而训练后期参数已经比较接近最优点，需要用小学习率做精细调整，否则容易在最优点附近来回震荡而无法收敛，这就是 decay 阶段的作用。</p>
+<p><strong>踩过的坑</strong>：训练时第一次设置 <code>steps</code> 为100k，训练结束后加载last checkpoint并更改 <code>steps</code> 为200k继续训练，此时 <code>loss曲线</code> 会呈现波动（如下图）。</p>
+<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/loss.png" style="height:400px" /></center>
+
+<p>排查后发现，原因在于学习率调度是按照「当前 step &#x2F; step 总数」这个比例来计算 <code>衰减进度</code> 的——第一次训练时，调度器以为总共只训 100k 步，所以在接近 100k 步时学习率已经衰减到很低；续训时把总步数改成了 200k，调度器重新按新的总步数计算衰减进度，导致学习率在续训起点被重新”拉高”了一截，直接反映成 loss 曲线在衔接处的波动。<code>learning rate</code> 曲线证实了这一点：</p>
+<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/lr.png" style="height:400px" /></center>
+
+<p><strong>关联概念</strong>：batch size（<code>steps</code> 和 <code>batch size</code> 共同决定有效训练量，调度器的衰减进度是按 <code>steps</code> 而非样本数计算的）、优化器（不同优化器对学习率的敏感度不同，Adam 类优化器相对更能容忍学习率的波动）</p>
+<hr>
+<h3 id="优化器（Adam、SGD、AdamW等）"><a href="#优化器（Adam、SGD、AdamW等）" class="headerlink" title="优化器（Adam、SGD、AdamW等）"></a>优化器（Adam、SGD、AdamW等）</h3><p><strong>定义</strong>：优化器决定了「已经算出梯度之后，具体怎么用这个梯度去更新参数」。几种常见优化器的核心区别：</p>
+<ul>
+<li><strong>SGD</strong>：最朴素的方式，直接用当前梯度乘以学习率去更新参数：<code>θ = θ - lr × grad</code>。梯度里有多少噪声，更新方向就带多少噪声，容易震荡。</li>
+<li><strong>Momentum（动量法）</strong>：不直接用当前梯度更新，而是维护一个”历史梯度的指数移动平均”（和 EMA 的思路是一致的），让更新方向更平滑，减少震荡，也能在梯度方向一致的维度上加速收敛。</li>
+<li><strong>Adam</strong>：在 Momentum 的基础上，再对每个参数维度维护一份”梯度平方的指数移动平均”，用它来给每个参数各自的学习率做自适应缩放——梯度一直很大的方向，实际步长会被适当调小；梯度一直很小的方向，步长会被适当放大。这让 Adam 对学习率的初始设置相对没那么敏感，也是它成为深度学习默认选择的原因之一。</li>
+<li><strong>AdamW</strong>：和 Adam 几乎一样，唯一区别是把权重衰减（weight decay，一种防止过拟合的正则化手段）从梯度更新公式里解耦出来，直接作用在参数上，而不是先混进梯度里再一起做自适应缩放。这样权重衰减的力度不会被 Adam 的自适应机制意外放大或缩小，效果更符合预期，现在大多数 Transformer &#x2F; 扩散模型的训练都默认用 AdamW。</li>
+</ul>
+<p><strong>为什么重要</strong>：扩散模型的训练目标（预测噪声）本身梯度噪声就比较大，Adam &#x2F; AdamW 这类自适应优化器能让训练在不用非常精细调学习率的情况下也能稳定收敛，这也是为什么这类模型的官方实现里几乎都默认用 AdamW，而不是 SGD。</p>
+<p><strong>关联概念</strong>：学习率调度（优化器和调度器是配合工作的两个模块，调度器决定学习率的”基准值”随时间怎么变，优化器决定每个参数实际拿到的”有效学习率”怎么自适应缩放）、EMA（Momentum 和 EMA 用的是同一种指数移动平均的数学工具，只是作用对象不同——一个平滑梯度，一个平滑参数）</p>
+<h2 id="2-数据与正则化（Data-Regularization）"><a href="#2-数据与正则化（Data-Regularization）" class="headerlink" title="2. 数据与正则化（Data &amp; Regularization）"></a>2. 数据与正则化（Data &amp; Regularization）</h2><p>概念只要和”怎么防止模型死记硬背训练集”有关，都进这里</p>
+<ul>
+<li><p>图像增强</p>
+</li>
+<li><p>Dropout</p>
+</li>
+<li><p>Weight decay</p>
+</li>
+<li><p>数据归一化 &#x2F; normalization</p>
+</li>
+<li><p>（以后遇到新的都加在这）</p>
+</li>
+</ul>
+<h2 id="3-训练诊断（Diagnostics）"><a href="#3-训练诊断（Diagnostics）" class="headerlink" title="3. 训练诊断（Diagnostics）"></a>3. 训练诊断（Diagnostics）</h2><p>概念只要和”训练过程中该看什么信号来判断训得好不好”有关</p>
+<ul>
+<li>loss 曲线的陷阱（plateau ≠ 收敛）</li>
+<li>过拟合 &#x2F; 欠拟合的信号</li>
+<li>梯度消失&#x2F;爆炸</li>
+<li>（以后遇到新的都加在这）</li>
+</ul>
+<h2 id="4-评估与实验设计（Evaluation-Experimental-Design）"><a href="#4-评估与实验设计（Evaluation-Experimental-Design）" class="headerlink" title="4. 评估与实验设计（Evaluation &amp; Experimental Design）"></a>4. 评估与实验设计（Evaluation &amp; Experimental Design）</h2><h3 id="Beta-后验-可信区间"><a href="#Beta-后验-可信区间" class="headerlink" title="Beta 后验 &#x2F; 可信区间"></a>Beta 后验 &#x2F; 可信区间</h3><p><strong>定义</strong>：</p>
+<ul>
+<li>首先解释先验&#x2F;后验：<ul>
+<li>先验 (prior)：看到数据前，对某个未知量的概率分布假设。</li>
+<li>后验 (posterior)：结合数据后，更新出来的新的概率分布。</li>
+</ul>
+</li>
+<li>beta 分布：定义在 [0,1] 上的分布，专门用来描述”未知的概率&#x2F;比例”（比如真实成功率），由两个参数控制形状。</li>
+<li>beta 后验：Beta 分布是二项似然的<strong>共轭先验</strong>——先验 <code>Beta(α,β)</code>，观测到 n 次实验 k 次成功后，后验就是 <code>Beta(α+k, β+n-k)</code>，闭式解，不用采样。从最无信息的 <code>Beta(1,1)</code> 出发，后验就是 <code>Beta(k+1, n-k+1)</code>。<ul>
+<li>“先验是 Beta 分布 Beta(α, β) + 似然是伯努利&#x2F;二项分布” 这个特定组合,才保证后验一定是 Beta(α+k, β+n-k)。</li>
+</ul>
+</li>
+<li>置信区间 (confidence interval): 频率学派。真实值是固定的，<strong>区间才是随机的</strong>——“重复抽样很多次，这些区间里大约 n% 会包住真实值”。</li>
+<li>可信区间 (credible interval): 贝叶斯。真实值本身被当作随机变量，直接从后验分布切一刀——“真实值有 n% 的可能落在这个区间内”。（这个概念更易懂一些）</li>
+</ul>
+<p><strong>为什么重要</strong>：小样本对照实验里，不能只比较两个点估计的大小（比如 47% vs 43%），因为样本量小的时候，点估计本身的抽样噪声可能远大于这个差距。可信区间把”这个点估计到底有多不确定”量化了出来，用两组区间是否大幅重叠，就能判断当前数据是否足以支撑”两者存在真实差异”这个结论，避免仅凭一次抽样的数字大小就下结论。</p>
+<p><strong>踩过的坑</strong>：区间重叠 ≠ “两者真实值相等的概率大”。重叠说明的是<strong>数据不够信息量去区分</strong>。真要比较谁更好，得直接对两个后验做差值推断（比如采样算 <code>P(θ_A &gt; θ_B)</code>），不是看区间重不重叠。</p>
+<p><strong>关联概念</strong>：二项似然（success&#x2F;fail 型实验的似然函数）</p>
+<h3 id="paired-comparison-vs-unpaired"><a href="#paired-comparison-vs-unpaired" class="headerlink" title="paired comparison vs unpaired"></a>paired comparison vs unpaired</h3><h3 id="样本量与统计功效"><a href="#样本量与统计功效" class="headerlink" title="样本量与统计功效"></a>样本量与统计功效</h3>]]></content>
+      <categories>
+        <category>学习笔记</category>
+      </categories>
+      <tags>
+        <tag>Deep Learning</tag>
+        <tag>Training</tag>
+        <tag>Evaluation</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>【学习笔记】VTLA相关概念总结</title>
     <url>/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/</url>
     <content><![CDATA[<h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><ul>
@@ -225,106 +308,37 @@
       </tags>
   </entry>
   <entry>
-    <title>【学习笔记】训练与评估</title>
-    <url>/2026/09/15/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/</url>
-    <content><![CDATA[<h2 id="1-模型与优化（Optimization）"><a href="#1-模型与优化（Optimization）" class="headerlink" title="1. 模型与优化（Optimization）"></a>1. 模型与优化（Optimization）</h2><h3 id="EMA（指数移动平均）"><a href="#EMA（指数移动平均）" class="headerlink" title="EMA（指数移动平均）"></a>EMA（指数移动平均）</h3><p><strong>定义</strong>：训练时除了梯度下降正常更新的参数 <code>θ_t</code>，额外维护一份影子参数 <code>θ_shadow</code>，它跟着真实参数走，但更新得更慢，不参与反向传播，只是被动更新：</p>
-<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">θ_shadow = decay * θ_shadow + (<span class="number">1</span> - decay) * θ_t</span><br></pre></td></tr></table></figure>
+    <title>【工具】git基本使用</title>
+    <url>/2025/09/21/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91git%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<p><strong>一、新项目第一次上传（只做一次）</strong></p>
+<ol>
+<li>在 github.com 点 New repository，起名，选 Public，<strong>不要</strong>勾选自动生成 README &#x2F; .gitignore &#x2F; license（本地已有内容时勾了会冲突）。</li>
+<li>本地进入项目文件夹，依次执行：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git init</span><br><span class="line">git add .</span><br><span class="line">git status                      <span class="comment"># 看一眼，确认要提交的文件对、没有多余的大文件或密钥</span></span><br><span class="line">git commit -m <span class="string">&quot;Initial commit&quot;</span></span><br><span class="line">git branch -M main</span><br><span class="line">git remote add origin https://github.com/Faunney/仓库名.git</span><br><span class="line">git push -u origin main</span><br></pre></td></tr></table></figure>
 
-<p><code>decay</code> 一般取 0.999。</p>
-<p><strong>为什么重要</strong>：eval 时用 <code>θ_shadow</code> 通常比用最后一步的 <code>θ_t</code> 更稳定、泛化更好，因为 shadow 参数相当于把训练后期的参数抖动做了平均。</p>
-<p><strong>踩过的坑</strong>：最初以为 <code>use_ema</code> 是可选的性能优化，后来发现有的官方基准（比如 lerobot&#x2F;diffusion_pusht）反而没开这个选项，说明它不是”越复杂越好”，要看具体基准配置。</p>
-<p><strong>关联概念</strong>：<code>batch_size</code>（同样影响训练稳定性）、图像增强（同样服务于泛化）</p>
-<hr>
-<h3 id="batch-size-批次大小"><a href="#batch-size-批次大小" class="headerlink" title="batch size (批次大小)"></a>batch size (批次大小)</h3><p><strong>定义</strong>：模型每处理完一个 batch（一批样本）就计算一次梯度、更新一次参数，这批样本的数量就是 <code>batch size</code>。它决定了每次参数更新时，梯度是基于多少个样本的信息综合出来的。</p>
-<p><strong>为什么重要</strong>：<code>batch size</code> 越大，单次梯度估计包含的样本信息越多、噪声越小，梯度方向更稳定，同样步数下往往能达到更好的效果；但代价是显存占用随 <code>batch size</code> 线性增长，过大会直接导致 OOM。另外 <code>batch size</code> 和学习率不是独立的——<code>batch size</code> 变大后梯度噪声变小，通常需要相应调大学习率（linear scaling rule），否则同样的学习率会显得”步子迈得太小”，收敛变慢。</p>
-<p><strong>踩过的坑</strong>：如果目标是复现某个 baseline，<code>batch size</code> 必须和原始设置对齐，而不能只对齐 <code>steps</code> 数——因为两者共同决定了模型实际”看过”多少样本（有效训练量 ≈ <code>batch_size × steps</code>）。</p>
-<p><strong>关联概念</strong>：EMA（<code>batch size</code> 影响梯度噪声，间接影响 shadow 参数的平滑效果是否必要）、学习率调度（<code>batch size</code> 变化时学习率通常要联动调整）</p>
-<hr>
-<h3 id="学习率调度（warmup、cosine-decay…）"><a href="#学习率调度（warmup、cosine-decay…）" class="headerlink" title="学习率调度（warmup、cosine decay…）"></a>学习率调度（warmup、cosine decay…）</h3><p><strong>定义</strong>：动态调整学习率。最常见的组合是「warmup + cosine decay」：训练最初的若干步，学习率从一个很小的值线性增长到设定的峰值（warmup）；之后再按余弦函数的形状，从峰值逐渐衰减到接近 0（cosine decay）。</p>
-<p><strong>为什么重要</strong>：训练刚开始时参数是随机初始化的，梯度方向往往很不准，如果一上来就用较大的学习率，容易在初期就把参数带偏甚至训练发散，所以需要 warmup 先”热身”；而训练后期参数已经比较接近最优点，需要用小学习率做精细调整，否则容易在最优点附近来回震荡而无法收敛，这就是 decay 阶段的作用。</p>
-<p><strong>踩过的坑</strong>：训练时第一次设置 <code>steps</code> 为100k，训练结束后加载last checkpoint并更改 <code>steps</code> 为200k继续训练，此时 <code>loss曲线</code> 会呈现波动（如下图）。</p>
-<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/loss.png" style="height:400px" /></center>
+<p><code>-u</code> 只在第一次需要，之后直接 <code>git push</code> 就行。</p>
+<p><strong>二、日常更新（常用）</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git status                      <span class="comment"># 看改了什么</span></span><br><span class="line">git add .                       <span class="comment"># 全部加入暂存（或 git add 文件名 只加某个文件）</span></span><br><span class="line">git commit -m <span class="string">&quot;简短说明这次改了什么&quot;</span></span><br><span class="line">git push</span><br></pre></td></tr></table></figure>
 
-<p>排查后发现，原因在于学习率调度是按照「当前 step &#x2F; step 总数」这个比例来计算 <code>衰减进度</code> 的——第一次训练时，调度器以为总共只训 100k 步，所以在接近 100k 步时学习率已经衰减到很低；续训时把总步数改成了 200k，调度器重新按新的总步数计算衰减进度，导致学习率在续训起点被重新”拉高”了一截，直接反映成 loss 曲线在衔接处的波动。<code>learning rate</code> 曲线证实了这一点：</p>
-<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/lr.png" style="height:400px" /></center>
-
-<p><strong>关联概念</strong>：batch size（<code>steps</code> 和 <code>batch size</code> 共同决定有效训练量，调度器的衰减进度是按 <code>steps</code> 而非样本数计算的）、优化器（不同优化器对学习率的敏感度不同，Adam 类优化器相对更能容忍学习率的波动）</p>
-<hr>
-<h3 id="优化器（Adam、SGD、AdamW等）"><a href="#优化器（Adam、SGD、AdamW等）" class="headerlink" title="优化器（Adam、SGD、AdamW等）"></a>优化器（Adam、SGD、AdamW等）</h3><p><strong>定义</strong>：优化器决定了「已经算出梯度之后，具体怎么用这个梯度去更新参数」。几种常见优化器的核心区别：</p>
+<p>想成”改文件 → add → commit → push”四步循环。commit 在本地存快照，push 才会上传到 GitHub。</p>
+<p><strong>三、几个容易踩的点</strong></p>
 <ul>
-<li><strong>SGD</strong>：最朴素的方式，直接用当前梯度乘以学习率去更新参数：<code>θ = θ - lr × grad</code>。梯度里有多少噪声，更新方向就带多少噪声，容易震荡。</li>
-<li><strong>Momentum（动量法）</strong>：不直接用当前梯度更新，而是维护一个”历史梯度的指数移动平均”（和 EMA 的思路是一致的），让更新方向更平滑，减少震荡，也能在梯度方向一致的维度上加速收敛。</li>
-<li><strong>Adam</strong>：在 Momentum 的基础上，再对每个参数维度维护一份”梯度平方的指数移动平均”，用它来给每个参数各自的学习率做自适应缩放——梯度一直很大的方向，实际步长会被适当调小；梯度一直很小的方向，步长会被适当放大。这让 Adam 对学习率的初始设置相对没那么敏感，也是它成为深度学习默认选择的原因之一。</li>
-<li><strong>AdamW</strong>：和 Adam 几乎一样，唯一区别是把权重衰减（weight decay，一种防止过拟合的正则化手段）从梯度更新公式里解耦出来，直接作用在参数上，而不是先混进梯度里再一起做自适应缩放。这样权重衰减的力度不会被 Adam 的自适应机制意外放大或缩小，效果更符合预期，现在大多数 Transformer &#x2F; 扩散模型的训练都默认用 AdamW。</li>
+<li><strong>先 <code>git status</code> 再 commit</strong>：绿色是已暂存，红色是没加上的，未跟踪文件要 add 才会进去。你这次的空提交就是漏了这一步。</li>
+<li><strong>commit 信息写清楚</strong>：比如 <code>Add README</code>、<code>Replace hardcoded paths with CLI args</code>、<code>Add eval results</code>，别全写 update。一个 commit 做一件事，记录会好看很多。</li>
+<li><strong><code>.gitignore</code> 第一次就建好</strong>：放不想上传的东西，比如：<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">*.npy</span><br><span class="line">*.pt</span><br><span class="line">*.safetensors</span><br><span class="line">checkpoints/</span><br><span class="line">outputs/</span><br><span class="line">wandb/</span><br><span class="line">__pycache__/</span><br><span class="line">.env</span><br></pre></td></tr></table></figure>
+注意 <code>.gitignore</code> 对已经提交过的文件不起作用，要先 <code>git rm --cached 文件名</code>。</li>
+<li><strong>别提交大文件和密钥</strong>：权重、数据集、API key（wandb、HuggingFace token）一律不进仓库。GitHub 单文件超过 100MB 会直接拒绝。密钥一旦推上去，即使删了也在历史里，需要作废重新生成。</li>
+<li><strong>推之前先拉</strong>：如果你在网页上直接改过文件（比如在 GitHub 上编辑了 README），本地推送会被拒绝，先 <code>git pull</code> 再 <code>git push</code>。</li>
 </ul>
-<p><strong>为什么重要</strong>：扩散模型的训练目标（预测噪声）本身梯度噪声就比较大，Adam &#x2F; AdamW 这类自适应优化器能让训练在不用非常精细调学习率的情况下也能稳定收敛，这也是为什么这类模型的官方实现里几乎都默认用 AdamW，而不是 SGD。</p>
-<p><strong>关联概念</strong>：学习率调度（优化器和调度器是配合工作的两个模块，调度器决定学习率的”基准值”随时间怎么变，优化器决定每个参数实际拿到的”有效学习率”怎么自适应缩放）、EMA（Momentum 和 EMA 用的是同一种指数移动平均的数学工具，只是作用对象不同——一个平滑梯度，一个平滑参数）</p>
-<h2 id="2-数据与正则化（Data-Regularization）"><a href="#2-数据与正则化（Data-Regularization）" class="headerlink" title="2. 数据与正则化（Data &amp; Regularization）"></a>2. 数据与正则化（Data &amp; Regularization）</h2><p>概念只要和”怎么防止模型死记硬背训练集”有关，都进这里</p>
-<ul>
-<li><p>图像增强</p>
-</li>
-<li><p>Dropout</p>
-</li>
-<li><p>Weight decay</p>
-</li>
-<li><p>数据归一化 &#x2F; normalization</p>
-</li>
-<li><p>（以后遇到新的都加在这）</p>
-</li>
-</ul>
-<h2 id="3-训练诊断（Diagnostics）"><a href="#3-训练诊断（Diagnostics）" class="headerlink" title="3. 训练诊断（Diagnostics）"></a>3. 训练诊断（Diagnostics）</h2><p>概念只要和”训练过程中该看什么信号来判断训得好不好”有关</p>
-<ul>
-<li>loss 曲线的陷阱（plateau ≠ 收敛）</li>
-<li>过拟合 &#x2F; 欠拟合的信号</li>
-<li>梯度消失&#x2F;爆炸</li>
-<li>（以后遇到新的都加在这）</li>
-</ul>
-<h2 id="4-评估与实验设计（Evaluation-Experimental-Design）"><a href="#4-评估与实验设计（Evaluation-Experimental-Design）" class="headerlink" title="4. 评估与实验设计（Evaluation &amp; Experimental Design）"></a>4. 评估与实验设计（Evaluation &amp; Experimental Design）</h2><h3 id="Beta-后验-可信区间"><a href="#Beta-后验-可信区间" class="headerlink" title="Beta 后验 &#x2F; 可信区间"></a>Beta 后验 &#x2F; 可信区间</h3><p><strong>定义</strong>：</p>
-<ul>
-<li>首先解释先验&#x2F;后验：<ul>
-<li>先验 (prior)：看到数据前，对某个未知量的概率分布假设。</li>
-<li>后验 (posterior)：结合数据后，更新出来的新的概率分布。</li>
-</ul>
-</li>
-<li>beta 分布：定义在 [0,1] 上的分布，专门用来描述”未知的概率&#x2F;比例”（比如真实成功率），由两个参数控制形状。</li>
-<li>beta 后验：Beta 分布是二项似然的<strong>共轭先验</strong>——先验 <code>Beta(α,β)</code>，观测到 n 次实验 k 次成功后，后验就是 <code>Beta(α+k, β+n-k)</code>，闭式解，不用采样。从最无信息的 <code>Beta(1,1)</code> 出发，后验就是 <code>Beta(k+1, n-k+1)</code>。<ul>
-<li>“先验是 Beta 分布 Beta(α, β) + 似然是伯努利&#x2F;二项分布” 这个特定组合,才保证后验一定是 Beta(α+k, β+n-k)。</li>
-</ul>
-</li>
-<li>置信区间 (confidence interval): 频率学派。真实值是固定的，<strong>区间才是随机的</strong>——“重复抽样很多次，这些区间里大约 n% 会包住真实值”。</li>
-<li>可信区间 (credible interval): 贝叶斯。真实值本身被当作随机变量，直接从后验分布切一刀——“真实值有 n% 的可能落在这个区间内”。（这个概念更易懂一些）</li>
-</ul>
-<p><strong>为什么重要</strong>：小样本对照实验里，不能只比较两个点估计的大小（比如 47% vs 43%），因为样本量小的时候，点估计本身的抽样噪声可能远大于这个差距。可信区间把”这个点估计到底有多不确定”量化了出来，用两组区间是否大幅重叠，就能判断当前数据是否足以支撑”两者存在真实差异”这个结论，避免仅凭一次抽样的数字大小就下结论。</p>
-<p><strong>踩过的坑</strong>：区间重叠 ≠ “两者真实值相等的概率大”。重叠说明的是<strong>数据不够信息量去区分</strong>。真要比较谁更好，得直接对两个后验做差值推断（比如采样算 <code>P(θ_A &gt; θ_B)</code>），不是看区间重不重叠。</p>
-<p><strong>关联概念</strong>：二项似然（success&#x2F;fail 型实验的似然函数）</p>
-<h3 id="paired-comparison-vs-unpaired"><a href="#paired-comparison-vs-unpaired" class="headerlink" title="paired comparison vs unpaired"></a>paired comparison vs unpaired</h3><h3 id="样本量与统计功效"><a href="#样本量与统计功效" class="headerlink" title="样本量与统计功效"></a>样本量与统计功效</h3>]]></content>
-      <categories>
-        <category>学习笔记</category>
-      </categories>
-      <tags>
-        <tag>Deep Learning</tag>
-        <tag>Training</tag>
-        <tag>Evaluation</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【工具】tmux基本使用</title>
-    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
-    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
-<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
-<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">apt update &amp;&amp; apt install -y sudo   <span class="comment"># 安装sudo</span></span><br><span class="line">sudo apt install tmux	<span class="comment"># Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment"># CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment"># MacOS</span></span><br></pre></td></tr></table></figure>
-<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
-<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
-<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
-<h2 id="6-设置tmux进入鼠标模式，即可使用滚轮翻看历史"><a href="#6-设置tmux进入鼠标模式，即可使用滚轮翻看历史" class="headerlink" title="6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史"></a>6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">set</span> -g mouse on</span><br><span class="line"></span><br><span class="line">tmux <span class="built_in">set</span> -g mouse off</span><br></pre></td></tr></table></figure>]]></content>
+<p><strong>四、几个偶尔有用的命令</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">log</span> --oneline               <span class="comment"># 看提交历史</span></span><br><span class="line">git diff                        <span class="comment"># 看还没 add 的改动</span></span><br><span class="line">git remote -v                   <span class="comment"># 看远端地址</span></span><br><span class="line">git restore 文件名               <span class="comment"># 丢弃某个文件的未提交改动（慎用）</span></span><br><span class="line">git <span class="built_in">clone</span> 仓库地址               <span class="comment"># 把别人的或自己的仓库下载到本地</span></span><br></pre></td></tr></table></figure>]]></content>
       <categories>
         <category>工具</category>
       </categories>
       <tags>
-        <tag>linux</tag>
-        <tag>tmux</tag>
+        <tag>git</tag>
+        <tag>github</tag>
       </tags>
   </entry>
   <entry>
@@ -387,6 +401,26 @@
       </tags>
   </entry>
   <entry>
+    <title>【工具】tmux基本使用</title>
+    <url>/2025/04/14/%E3%80%90%E5%B7%A5%E5%85%B7%E3%80%91tmux%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><p>例如：<br>在服务器上跑一些耗时的程序或下载一些大文件，ssh断开的时候也希望持续执行任务。</p>
+<p>此时可以用tmux开一个新的终端会话（session），只要服务器不关机且不关闭该会话，不管断开多长时间都可以再次访问到这个会话。</p>
+<h1 id="下载tmux"><a href="#下载tmux" class="headerlink" title="下载tmux"></a>下载tmux</h1><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">apt update &amp;&amp; apt install -y sudo   <span class="comment"># 安装sudo</span></span><br><span class="line">sudo apt install tmux	<span class="comment"># Ubuntu</span></span><br><span class="line"></span><br><span class="line">sudo yum install tmux	<span class="comment"># CentOS</span></span><br><span class="line"></span><br><span class="line">brew install tmux	<span class="comment"># MacOS</span></span><br></pre></td></tr></table></figure>
+<h1 id="tmux基本命令"><a href="#tmux基本命令" class="headerlink" title="tmux基本命令"></a>tmux基本命令</h1><h2 id="1-创建tmux新会话"><a href="#1-创建tmux新会话" class="headerlink" title="1. 创建tmux新会话"></a>1. 创建tmux新会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux new -s [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="2-暂时退出当前tmux会话窗口"><a href="#2-暂时退出当前tmux会话窗口" class="headerlink" title="2. 暂时退出当前tmux会话窗口"></a>2. 暂时退出当前tmux会话窗口</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux detach</span><br></pre></td></tr></table></figure>
+<h2 id="3-查看当前所有tmux会话"><a href="#3-查看当前所有tmux会话" class="headerlink" title="3. 查看当前所有tmux会话"></a>3. 查看当前所有tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">ls</span></span><br></pre></td></tr></table></figure>
+<h2 id="4-再次打开tmux会话"><a href="#4-再次打开tmux会话" class="headerlink" title="4. 再次打开tmux会话"></a>4. 再次打开tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux a -t [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="5-关闭tmux会话"><a href="#5-关闭tmux会话" class="headerlink" title="5. 关闭tmux会话"></a>5. 关闭tmux会话</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux kill-session -t [session_name]</span><br></pre></td></tr></table></figure>
+<h2 id="6-设置tmux进入鼠标模式，即可使用滚轮翻看历史"><a href="#6-设置tmux进入鼠标模式，即可使用滚轮翻看历史" class="headerlink" title="6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史"></a>6. 设置tmux进入鼠标模式，即可使用滚轮翻看历史</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">tmux <span class="built_in">set</span> -g mouse on</span><br><span class="line"></span><br><span class="line">tmux <span class="built_in">set</span> -g mouse off</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>工具</category>
+      </categories>
+      <tags>
+        <tag>linux</tag>
+        <tag>tmux</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>【散记】first_publish</title>
     <url>/2024/05/17/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91first-publish/</url>
     <content><![CDATA[<h1 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h1><p>暂时装修完啦 欢迎访问 ᥫ᭡ˎˊ-</p>
@@ -399,6 +433,106 @@
       <tags>
         <tag>blog</tag>
         <tag>hexo</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【论文笔记】STAMP方法论精读</title>
+    <url>/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/</url>
+    <content><![CDATA[<p><strong>STAMP: Scalable Task And Model-agnostic Collaborative Perception 方法论部分精读</strong><br><br>项目网页链接：<a href="https://xiangbogaobarry.github.io/STAMP/">https://xiangbogaobarry.github.io/STAMP/</a></p>
+<p><strong>一句话总结</strong></p>
+<p>简易版：STAMP是一个改进版支持异构代理的协同感知框架。</p>
+<p>详细版：STAMP是一个为异构代理量身定制的可扩展的任务和模型不可知的协同感知框架。</p>
+<div class="timeline undefined"><div class='timeline-item headline'><div class='timeline-item-title'><div class='item-circle'><p>相关进展</p>
+</div></div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>OpenCOOD</p>
+</div></div><div class='timeline-item-content'><p>协同感知框架</p>
+</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>HEAL</p>
+</div></div><div class='timeline-item-content'><p>支持异构的协同感知框架</p>
+</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>STAMP</p>
+</div></div><div class='timeline-item-content'><p>方法改良的支持异构的协同感知框架</p>
+</div></div></div>
+
+
+<h1 id="现有CP-process"><a href="#现有CP-process" class="headerlink" title="现有CP process"></a>现有CP process</h1><p>N个代理（agent）每个都有自己的CP模型</p>
+<p>本文所有CP都用中间融合</p>
+<p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
+<h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" /></center>
+
+<ul>
+<li><strong>Encoding</strong>: input sensor data → BEV feature</li>
+<li><strong>Compression</strong>: BEV feature → compressed BEV feature</li>
+</ul>
+<p>📢 broadcasting compressed BEV feature to other agents in range δ</p>
+<p>📬 receiving other BEV features from other agents</p>
+<ul>
+<li><strong>Decompression</strong>: compressed BEV feature from j → BEV feature j (using decompressor i)</li>
+<li><strong>Fusion</strong>: all BEV features in range δ → new BEV feature i</li>
+<li><strong>Decoding</strong>: new BEV feature i → output i</li>
+</ul>
+<h1 id="STAMP框架"><a href="#STAMP框架" class="headerlink" title="STAMP框架"></a>STAMP框架</h1><p>用adaptation和reversion替代compression和decompression</p>
+<p>即设计adapter和reverter</p>
+<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" /></center>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" /></center>
+
+<ul>
+<li>…</li>
+<li><strong>Adaptation</strong>: local BEV feature i → protocol feature i (BEV)</li>
+</ul>
+<p>📢 broadcasting protocol feature to other agents in range δ</p>
+<p>📬 receiving other protocol features from other agents</p>
+<ul>
+<li><strong>Reversion</strong>: other protocol features → reverted protocol features</li>
+<li><strong>Fusion</strong>: reverted protocol features + locol BEV feature i → new BEV feature i</li>
+<li>…</li>
+</ul>
+<p>STAMP支持不同<strong>模态modality</strong>(eg. m1 m2 …)、<strong>模型架构model_architecture</strong>(eg. Encoder: Resnet101 EfficientNet)和<strong>下游任务downstream_task</strong>的代理。</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:550px" /></center>
+
+<h1 id="协同特征对齐模块（CFA）"><a href="#协同特征对齐模块（CFA）" class="headerlink" title="协同特征对齐模块（CFA）"></a>协同特征对齐模块（CFA）</h1><p>CFA：用来训练统一的BEV feature表示和每个代理的adapter-reverter对</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:500px" /></center>
+
+<h2 id="CFA训练流程："><a href="#CFA训练流程：" class="headerlink" title="CFA训练流程："></a>CFA训练流程：</h2><ol>
+<li><p>训练 protocol network</p>
+<p> 与传统CP流程类似</p>
+<p> protocol encoder: Ep</p>
+<p> (compressor and decompressor为恒等函数 即输入&#x3D;输出)</p>
+<p> protocol fusion model: Up</p>
+<p> protocol decoder: Dp</p>
+</li>
+<li><p>训练 local adapter-reverters</p>
+<p> Τ（模态变换函数）: Χ（周围环境状态） → I（输入数据）</p>
+<p> Ti是local model的传感器模态，Tp是protocol model的传感器模态。二者分别把传感器信息转化成Ii和Ip给Ei和Ep，再转化为Fi和Fp。</p>
+<p> 因此adapter的作用是填补T和E叠加出的domian gap，其训练的目标函数即Fp与Φi(Fi)的特征对齐损失。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" /></center>
+ 
+<p> 对应地，reverter的目标函数可为Ψi(Fp)与Fi的特征对齐损失。而本文在此基础上增加了一个额外监督，即Ψi(Fp)与Ψi(Φi(Fi))的特征对齐损失。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" /></center>
+ 
+<p> 对于这个“特征对齐”，将在特征空间和决策空间两处进行。</p>
+</li>
+<li><p>特征空间对齐</p>
+<p> 用L2-norm对齐Fp与Φi(Fi)、Ψi(Fp)与Fi、Ψi(Fp)与Ψi(Φi(Fi))。</p>
+<p> 共K个周围环境状态，因此共K组3对特征对</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" /></center>
+ </li>
+<li><p>决策空间对齐</p>
+<p> 此处损失函数是针对下游任务设计的，有local和protocol版本。GT为ground truth labels。</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" /></center>
+
+<p> 在此基础上加入权重，总损失函数如下：</p>
+ <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></center></li>
+</ol>
+<h1 id="adapter和reverter的结构"><a href="#adapter和reverter的结构" class="headerlink" title="adapter和reverter的结构"></a>adapter和reverter的结构</h1><p>domian gap三大来源：空间分辨率、feature patterns、通道尺寸。</p>
+<p>空间分辨率：采用简单的线性插值进行对齐</p>
+<p>feature patterns：用三个具有隐藏通道维度Chidden的ConvNeXt层对齐</p>
+<p>通道尺寸：用两个额外的卷积层对齐</p>
+<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" /></center>]]></content>
+      <categories>
+        <category>论文笔记</category>
+      </categories>
+      <tags>
+        <tag>paper</tag>
+        <tag>collaborative perception</tag>
       </tags>
   </entry>
   <entry>
@@ -542,109 +676,9 @@ $$ -->
         <category>论文笔记</category>
       </categories>
       <tags>
+        <tag>paper</tag>
         <tag>CG</tag>
-        <tag>paper</tag>
         <tag>neural-rendering</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【论文笔记】STAMP方法论精读</title>
-    <url>/2025/04/23/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%91STAMP%E6%96%B9%E6%B3%95%E8%AE%BA%E7%B2%BE%E8%AF%BB/</url>
-    <content><![CDATA[<p><strong>STAMP: Scalable Task And Model-agnostic Collaborative Perception 方法论部分精读</strong><br><br>项目网页链接：<a href="https://xiangbogaobarry.github.io/STAMP/">https://xiangbogaobarry.github.io/STAMP/</a></p>
-<p><strong>一句话总结</strong></p>
-<p>简易版：STAMP是一个改进版支持异构代理的协同感知框架。</p>
-<p>详细版：STAMP是一个为异构代理量身定制的可扩展的任务和模型不可知的协同感知框架。</p>
-<div class="timeline undefined"><div class='timeline-item headline'><div class='timeline-item-title'><div class='item-circle'><p>相关进展</p>
-</div></div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>OpenCOOD</p>
-</div></div><div class='timeline-item-content'><p>协同感知框架</p>
-</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>HEAL</p>
-</div></div><div class='timeline-item-content'><p>支持异构的协同感知框架</p>
-</div></div><div class='timeline-item'><div class='timeline-item-title'><div class='item-circle'><p>STAMP</p>
-</div></div><div class='timeline-item-content'><p>方法改良的支持异构的协同感知框架</p>
-</div></div></div>
-
-
-<h1 id="现有CP-process"><a href="#现有CP-process" class="headerlink" title="现有CP process"></a>现有CP process</h1><p>N个代理（agent）每个都有自己的CP模型</p>
-<p>本文所有CP都用中间融合</p>
-<p>一个CP模型包含：encoder编码器Ei、compressor压缩器Φi、decompressor解压缩器Ψi、collaborative fusion layer协作融合层Ui、decoder解码器Di</p>
-<h2 id="现有中间融合CP-process："><a href="#现有中间融合CP-process：" class="headerlink" title="现有中间融合CP process："></a>现有中间融合CP process：</h2><p>（本车为i，它车为j）</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-16_10.22.29.png" style="height:150px" /></center>
-
-<ul>
-<li><strong>Encoding</strong>: input sensor data → BEV feature</li>
-<li><strong>Compression</strong>: BEV feature → compressed BEV feature</li>
-</ul>
-<p>📢 broadcasting compressed BEV feature to other agents in range δ</p>
-<p>📬 receiving other BEV features from other agents</p>
-<ul>
-<li><strong>Decompression</strong>: compressed BEV feature from j → BEV feature j (using decompressor i)</li>
-<li><strong>Fusion</strong>: all BEV features in range δ → new BEV feature i</li>
-<li><strong>Decoding</strong>: new BEV feature i → output i</li>
-</ul>
-<h1 id="STAMP框架"><a href="#STAMP框架" class="headerlink" title="STAMP框架"></a>STAMP框架</h1><p>用adaptation和reversion替代compression和decompression</p>
-<p>即设计adapter和reverter</p>
-<h2 id="CP-process-in-STAMP"><a href="#CP-process-in-STAMP" class="headerlink" title="CP process in STAMP:"></a>CP process in STAMP:</h2><center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-16_11.12.48.png" style="height:40px" /></center>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-16_11.13.27.png" style="height:60px" /></center>
-
-<ul>
-<li>…</li>
-<li><strong>Adaptation</strong>: local BEV feature i → protocol feature i (BEV)</li>
-</ul>
-<p>📢 broadcasting protocol feature to other agents in range δ</p>
-<p>📬 receiving other protocol features from other agents</p>
-<ul>
-<li><strong>Reversion</strong>: other protocol features → reverted protocol features</li>
-<li><strong>Fusion</strong>: reverted protocol features + locol BEV feature i → new BEV feature i</li>
-<li>…</li>
-</ul>
-<p>STAMP支持不同<strong>模态modality</strong>(eg. m1 m2 …)、<strong>模型架构model_architecture</strong>(eg. Encoder: Resnet101 EfficientNet)和<strong>下游任务downstream_task</strong>的代理。</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-22_17.26.08.png" style="height:550px" /></center>
-
-<h1 id="协同特征对齐模块（CFA）"><a href="#协同特征对齐模块（CFA）" class="headerlink" title="协同特征对齐模块（CFA）"></a>协同特征对齐模块（CFA）</h1><p>CFA：用来训练统一的BEV feature表示和每个代理的adapter-reverter对</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_10.10.56.png" style="height:500px" /></center>
-
-<h2 id="CFA训练流程："><a href="#CFA训练流程：" class="headerlink" title="CFA训练流程："></a>CFA训练流程：</h2><ol>
-<li><p>训练 protocol network</p>
-<p> 与传统CP流程类似</p>
-<p> protocol encoder: Ep</p>
-<p> (compressor and decompressor为恒等函数 即输入&#x3D;输出)</p>
-<p> protocol fusion model: Up</p>
-<p> protocol decoder: Dp</p>
-</li>
-<li><p>训练 local adapter-reverters</p>
-<p> Τ（模态变换函数）: Χ（周围环境状态） → I（输入数据）</p>
-<p> Ti是local model的传感器模态，Tp是protocol model的传感器模态。二者分别把传感器信息转化成Ii和Ip给Ei和Ep，再转化为Fi和Fp。</p>
-<p> 因此adapter的作用是填补T和E叠加出的domian gap，其训练的目标函数即Fp与Φi(Fi)的特征对齐损失。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_14.45.08.png" style="height:50px" /></center>
- 
-<p> 对应地，reverter的目标函数可为Ψi(Fp)与Fi的特征对齐损失。而本文在此基础上增加了一个额外监督，即Ψi(Fp)与Ψi(Φi(Fi))的特征对齐损失。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_15.48.50.png" style="height:50px" /></center>
- 
-<p> 对于这个“特征对齐”，将在特征空间和决策空间两处进行。</p>
-</li>
-<li><p>特征空间对齐</p>
-<p> 用L2-norm对齐Fp与Φi(Fi)、Ψi(Fp)与Fi、Ψi(Fp)与Ψi(Φi(Fi))。</p>
-<p> 共K个周围环境状态，因此共K组3对特征对</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_17.09.24.png" style="height:50px" /></center>
- </li>
-<li><p>决策空间对齐</p>
-<p> 此处损失函数是针对下游任务设计的，有local和protocol版本。GT为ground truth labels。</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_17.29.19.png" style="height:70px" /></center>
-
-<p> 在此基础上加入权重，总损失函数如下：</p>
- <center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_17.54.31.png" style="height:40px" /></center></li>
-</ol>
-<h1 id="adapter和reverter的结构"><a href="#adapter和reverter的结构" class="headerlink" title="adapter和reverter的结构"></a>adapter和reverter的结构</h1><p>domian gap三大来源：空间分辨率、feature patterns、通道尺寸。</p>
-<p>空间分辨率：采用简单的线性插值进行对齐</p>
-<p>feature patterns：用三个具有隐藏通道维度Chidden的ConvNeXt层对齐</p>
-<p>通道尺寸：用两个额外的卷积层对齐</p>
-<center><img class="inline-img" src="/../img/STAMP%E8%AE%BA%E6%96%87%E9%98%85%E8%AF%BB/%E6%88%AA%E5%B1%8F2025-04-21_18.13.21.png" style="height:400px" /></center>]]></content>
-      <categories>
-        <category>论文笔记</category>
-      </categories>
-      <tags>
-        <tag>paper</tag>
-        <tag>collaborative perception</tag>
       </tags>
   </entry>
   <entry>
@@ -822,13 +856,13 @@ $$ -->
 <td align="right"><strong>+0.0585</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#99;&#64;&#x30;&#46;&#50;&#x35;">&#65;&#99;&#99;&#64;&#x30;&#46;&#50;&#x35;</a></td>
+<td><a href="mailto:&#65;&#99;&#99;&#x40;&#x30;&#46;&#50;&#53;">&#65;&#99;&#99;&#x40;&#x30;&#46;&#50;&#53;</a></td>
 <td align="right">0.2958</td>
 <td align="right"><strong>0.3662</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#x63;&#99;&#64;&#48;&#46;&#x35;">&#x41;&#x63;&#99;&#64;&#48;&#46;&#x35;</a></td>
+<td><a href="mailto:&#65;&#x63;&#x63;&#64;&#x30;&#46;&#x35;">&#65;&#x63;&#x63;&#64;&#x30;&#46;&#x35;</a></td>
 <td align="right">0.1690</td>
 <td align="right"><strong>0.2394</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
@@ -892,13 +926,13 @@ $$ -->
 <td align="right"><strong>0.3379</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#x63;&#64;&#48;&#46;&#x32;&#x35;">&#65;&#99;&#x63;&#64;&#48;&#46;&#x32;&#x35;</a></td>
+<td><a href="mailto:&#65;&#99;&#99;&#x40;&#x30;&#x2e;&#x32;&#53;">&#65;&#99;&#99;&#x40;&#x30;&#x2e;&#x32;&#53;</a></td>
 <td align="right">0.2958</td>
 <td align="right">0.3662</td>
 <td align="right"><strong>0.4648</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#99;&#x40;&#48;&#46;&#x35;">&#65;&#99;&#99;&#x40;&#48;&#46;&#x35;</a></td>
+<td><a href="mailto:&#65;&#99;&#x63;&#x40;&#x30;&#46;&#x35;">&#65;&#99;&#x63;&#x40;&#x30;&#46;&#x35;</a></td>
 <td align="right">0.1690</td>
 <td align="right">0.2394</td>
 <td align="right"><strong>0.3803</strong></td>
@@ -914,8 +948,8 @@ $$ -->
 <th>train</th>
 <th>render</th>
 <th align="right">mIoU</th>
-<th align="right"><a href="mailto:&#x41;&#99;&#x63;&#x40;&#48;&#46;&#x32;&#53;">&#x41;&#99;&#x63;&#x40;&#48;&#46;&#x32;&#53;</a></th>
-<th align="right"><a href="mailto:&#x41;&#x63;&#99;&#64;&#x30;&#x2e;&#53;">&#x41;&#x63;&#99;&#64;&#x30;&#x2e;&#53;</a></th>
+<th align="right"><a href="mailto:&#x41;&#x63;&#99;&#64;&#x30;&#x2e;&#50;&#x35;">&#x41;&#x63;&#99;&#64;&#x30;&#x2e;&#50;&#x35;</a></th>
+<th align="right"><a href="mailto:&#65;&#x63;&#99;&#x40;&#48;&#x2e;&#53;">&#65;&#x63;&#99;&#x40;&#48;&#x2e;&#53;</a></th>
 </tr>
 </thead>
 <tbody><tr>
