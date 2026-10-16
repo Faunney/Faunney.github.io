@@ -1,6 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>【学习笔记】训练与评估</title>
+    <url>/2026/09/15/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/</url>
+    <content><![CDATA[<h2 id="1-模型与优化（Optimization）"><a href="#1-模型与优化（Optimization）" class="headerlink" title="1. 模型与优化（Optimization）"></a>1. 模型与优化（Optimization）</h2><h3 id="EMA（指数移动平均）"><a href="#EMA（指数移动平均）" class="headerlink" title="EMA（指数移动平均）"></a>EMA（指数移动平均）</h3><p><strong>定义</strong>：训练时除了梯度下降正常更新的参数 <code>θ_t</code>，额外维护一份影子参数 <code>θ_shadow</code>，它跟着真实参数走，但更新得更慢，不参与反向传播，只是被动更新：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">θ_shadow = decay * θ_shadow + (<span class="number">1</span> - decay) * θ_t</span><br></pre></td></tr></table></figure>
+
+<p><code>decay</code> 一般取 0.999。</p>
+<p><strong>为什么重要</strong>：eval 时用 <code>θ_shadow</code> 通常比用最后一步的 <code>θ_t</code> 更稳定、泛化更好，因为 shadow 参数相当于把训练后期的参数抖动做了平均。</p>
+<p><strong>踩过的坑</strong>：最初以为 <code>use_ema</code> 是可选的性能优化，后来发现有的官方基准（比如 lerobot&#x2F;diffusion_pusht）反而没开这个选项，说明它不是”越复杂越好”，要看具体基准配置。</p>
+<p><strong>关联概念</strong>：<code>batch_size</code>（同样影响训练稳定性）、图像增强（同样服务于泛化）</p>
+<hr>
+<h3 id="batch-size-批次大小"><a href="#batch-size-批次大小" class="headerlink" title="batch size (批次大小)"></a>batch size (批次大小)</h3><p><strong>定义</strong>：模型每处理完一个 batch（一批样本）就计算一次梯度、更新一次参数，这批样本的数量就是 <code>batch size</code>。它决定了每次参数更新时，梯度是基于多少个样本的信息综合出来的。</p>
+<p><strong>为什么重要</strong>：<code>batch size</code> 越大，单次梯度估计包含的样本信息越多、噪声越小，梯度方向更稳定，同样步数下往往能达到更好的效果；但代价是显存占用随 <code>batch size</code> 线性增长，过大会直接导致 OOM。另外 <code>batch size</code> 和学习率不是独立的——<code>batch size</code> 变大后梯度噪声变小，通常需要相应调大学习率（linear scaling rule），否则同样的学习率会显得”步子迈得太小”，收敛变慢。</p>
+<p><strong>踩过的坑</strong>：如果目标是复现某个 baseline，<code>batch size</code> 必须和原始设置对齐，而不能只对齐 <code>steps</code> 数——因为两者共同决定了模型实际”看过”多少样本（有效训练量 ≈ <code>batch_size × steps</code>）。</p>
+<p><strong>关联概念</strong>：EMA（<code>batch size</code> 影响梯度噪声，间接影响 shadow 参数的平滑效果是否必要）、学习率调度（<code>batch size</code> 变化时学习率通常要联动调整）</p>
+<hr>
+<h3 id="学习率调度（warmup、cosine-decay…）"><a href="#学习率调度（warmup、cosine-decay…）" class="headerlink" title="学习率调度（warmup、cosine decay…）"></a>学习率调度（warmup、cosine decay…）</h3><p><strong>定义</strong>：动态调整学习率。最常见的组合是「warmup + cosine decay」：训练最初的若干步，学习率从一个很小的值线性增长到设定的峰值（warmup）；之后再按余弦函数的形状，从峰值逐渐衰减到接近 0（cosine decay）。</p>
+<p><strong>为什么重要</strong>：训练刚开始时参数是随机初始化的，梯度方向往往很不准，如果一上来就用较大的学习率，容易在初期就把参数带偏甚至训练发散，所以需要 warmup 先”热身”；而训练后期参数已经比较接近最优点，需要用小学习率做精细调整，否则容易在最优点附近来回震荡而无法收敛，这就是 decay 阶段的作用。</p>
+<p><strong>踩过的坑</strong>：训练时第一次设置 <code>steps</code> 为100k，训练结束后加载last checkpoint并更改 <code>steps</code> 为200k继续训练，此时 <code>loss曲线</code> 会呈现波动（如下图）。</p>
+<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/loss.png" style="height:400px" /></center>
+
+<p>排查后发现，原因在于学习率调度是按照「当前 step &#x2F; step 总数」这个比例来计算 <code>衰减进度</code> 的——第一次训练时，调度器以为总共只训 100k 步，所以在接近 100k 步时学习率已经衰减到很低；续训时把总步数改成了 200k，调度器重新按新的总步数计算衰减进度，导致学习率在续训起点被重新”拉高”了一截，直接反映成 loss 曲线在衔接处的波动。<code>learning rate</code> 曲线证实了这一点：</p>
+<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/lr.png" style="height:400px" /></center>
+
+<p><strong>关联概念</strong>：batch size（<code>steps</code> 和 <code>batch size</code> 共同决定有效训练量，调度器的衰减进度是按 <code>steps</code> 而非样本数计算的）、优化器（不同优化器对学习率的敏感度不同，Adam 类优化器相对更能容忍学习率的波动）</p>
+<hr>
+<h3 id="优化器（Adam、SGD、AdamW等）"><a href="#优化器（Adam、SGD、AdamW等）" class="headerlink" title="优化器（Adam、SGD、AdamW等）"></a>优化器（Adam、SGD、AdamW等）</h3><p><strong>定义</strong>：优化器决定了「已经算出梯度之后，具体怎么用这个梯度去更新参数」。几种常见优化器的核心区别：</p>
+<ul>
+<li><strong>SGD</strong>：最朴素的方式，直接用当前梯度乘以学习率去更新参数：<code>θ = θ - lr × grad</code>。梯度里有多少噪声，更新方向就带多少噪声，容易震荡。</li>
+<li><strong>Momentum（动量法）</strong>：不直接用当前梯度更新，而是维护一个”历史梯度的指数移动平均”（和 EMA 的思路是一致的），让更新方向更平滑，减少震荡，也能在梯度方向一致的维度上加速收敛。</li>
+<li><strong>Adam</strong>：在 Momentum 的基础上，再对每个参数维度维护一份”梯度平方的指数移动平均”，用它来给每个参数各自的学习率做自适应缩放——梯度一直很大的方向，实际步长会被适当调小；梯度一直很小的方向，步长会被适当放大。这让 Adam 对学习率的初始设置相对没那么敏感，也是它成为深度学习默认选择的原因之一。</li>
+<li><strong>AdamW</strong>：和 Adam 几乎一样，唯一区别是把权重衰减（weight decay，一种防止过拟合的正则化手段）从梯度更新公式里解耦出来，直接作用在参数上，而不是先混进梯度里再一起做自适应缩放。这样权重衰减的力度不会被 Adam 的自适应机制意外放大或缩小，效果更符合预期，现在大多数 Transformer &#x2F; 扩散模型的训练都默认用 AdamW。</li>
+</ul>
+<p><strong>为什么重要</strong>：扩散模型的训练目标（预测噪声）本身梯度噪声就比较大，Adam &#x2F; AdamW 这类自适应优化器能让训练在不用非常精细调学习率的情况下也能稳定收敛，这也是为什么这类模型的官方实现里几乎都默认用 AdamW，而不是 SGD。</p>
+<p><strong>关联概念</strong>：学习率调度（优化器和调度器是配合工作的两个模块，调度器决定学习率的”基准值”随时间怎么变，优化器决定每个参数实际拿到的”有效学习率”怎么自适应缩放）、EMA（Momentum 和 EMA 用的是同一种指数移动平均的数学工具，只是作用对象不同——一个平滑梯度，一个平滑参数）</p>
+<hr>
+<h3 id="step-epoch-batch：监督学习-vs-RL-的含义差别"><a href="#step-epoch-batch：监督学习-vs-RL-的含义差别" class="headerlink" title="step &#x2F; epoch &#x2F; batch：监督学习 vs RL 的含义差别"></a>step &#x2F; epoch &#x2F; batch：监督学习 vs RL 的含义差别</h3><p><strong>定义</strong>：</p>
+<ul>
+<li>监督学习 &#x2F; SFT &#x2F; 模仿学习：数据固定。step &#x3D; 一次参数更新；epoch &#x3D; 过一遍整个数据集；batch size &#x3D; 每次更新用的样本数。</li>
+<li>RL（以 SB3 的 PPO 为例）：数据由当前策略采样产生。<ul>
+<li><code>n_steps</code>：每个环境一次收集多少步环境交互</li>
+<li><code>n_envs</code>：并行环境数。一次 rollout 的样本数 &#x3D; n_steps × n_envs</li>
+<li><code>batch_size</code>：从这批样本里切 minibatch 的大小</li>
+<li><code>n_epochs</code>：这批新数据重复用几遍，用完即弃</li>
+<li><code>total_timesteps</code>：总共要和环境交互多少步（决定采样几轮）</li>
+</ul>
+</li>
+<li>每轮参数更新次数 &#x3D; n_epochs × (n_steps × n_envs ÷ batch_size)</li>
+<li>采样轮数 ≈ total_timesteps ÷ (n_steps × n_envs)</li>
+</ul>
+<p><strong>为什么重要</strong>：RL 里的 step 有歧义，既可能是环境步，也可能是参数更新步。读论文或文档时先看它的单位。另外，”rollout” 有时指一条完整轨迹（trajectory），有时指一批收集的步数据。</p>
+<p><strong>踩过的坑</strong>：RL 里 loss 下降不等于变好，因为数据分布随策略在变，要看 <code>ep_rew_mean</code> 等回报指标。</p>
+<p><strong>关联概念</strong>：batch size（监督学习版）、学习率调度（RL 里按 total_timesteps 算进度）、Beta 后验（RL 评估同样需要考虑方差）</p>
+<h2 id="2-数据与正则化（Data-Regularization）"><a href="#2-数据与正则化（Data-Regularization）" class="headerlink" title="2. 数据与正则化（Data &amp; Regularization）"></a>2. 数据与正则化（Data &amp; Regularization）</h2><p>概念只要和”怎么防止模型死记硬背训练集”有关，都进这里</p>
+<ul>
+<li><p>图像增强</p>
+</li>
+<li><p>Dropout</p>
+</li>
+<li><p>Weight decay</p>
+</li>
+<li><p>数据归一化 &#x2F; normalization</p>
+</li>
+<li><p>（以后遇到新的都加在这）</p>
+</li>
+</ul>
+<h2 id="3-训练诊断（Diagnostics）"><a href="#3-训练诊断（Diagnostics）" class="headerlink" title="3. 训练诊断（Diagnostics）"></a>3. 训练诊断（Diagnostics）</h2><p>概念只要和”训练过程中该看什么信号来判断训得好不好”有关</p>
+<ul>
+<li>loss 曲线的陷阱（plateau ≠ 收敛）</li>
+<li>过拟合 &#x2F; 欠拟合的信号</li>
+<li>梯度消失&#x2F;爆炸</li>
+<li>（以后遇到新的都加在这）</li>
+</ul>
+<h2 id="4-评估与实验设计（Evaluation-Experimental-Design）"><a href="#4-评估与实验设计（Evaluation-Experimental-Design）" class="headerlink" title="4. 评估与实验设计（Evaluation &amp; Experimental Design）"></a>4. 评估与实验设计（Evaluation &amp; Experimental Design）</h2><h3 id="Beta-后验-可信区间"><a href="#Beta-后验-可信区间" class="headerlink" title="Beta 后验 &#x2F; 可信区间"></a>Beta 后验 &#x2F; 可信区间</h3><p><strong>定义</strong>：</p>
+<ul>
+<li>首先解释先验&#x2F;后验：<ul>
+<li>先验 (prior)：看到数据前，对某个未知量的概率分布假设。</li>
+<li>后验 (posterior)：结合数据后，更新出来的新的概率分布。</li>
+</ul>
+</li>
+<li>beta 分布：定义在 [0,1] 上的分布，专门用来描述”未知的概率&#x2F;比例”（比如真实成功率），由两个参数控制形状。</li>
+<li>beta 后验：Beta 分布是二项似然的<strong>共轭先验</strong>——先验 <code>Beta(α,β)</code>，观测到 n 次实验 k 次成功后，后验就是 <code>Beta(α+k, β+n-k)</code>，闭式解，不用采样。从最无信息的 <code>Beta(1,1)</code> 出发，后验就是 <code>Beta(k+1, n-k+1)</code>。<ul>
+<li>“先验是 Beta 分布 Beta(α, β) + 似然是伯努利&#x2F;二项分布” 这个特定组合,才保证后验一定是 Beta(α+k, β+n-k)。</li>
+</ul>
+</li>
+<li>置信区间 (confidence interval): 频率学派。真实值是固定的，<strong>区间才是随机的</strong>——“重复抽样很多次，这些区间里大约 n% 会包住真实值”。</li>
+<li>可信区间 (credible interval): 贝叶斯。真实值本身被当作随机变量，直接从后验分布切一刀——“真实值有 n% 的可能落在这个区间内”。（这个概念更易懂一些）</li>
+</ul>
+<p><strong>为什么重要</strong>：小样本对照实验里，不能只比较两个点估计的大小（比如 47% vs 43%），因为样本量小的时候，点估计本身的抽样噪声可能远大于这个差距。可信区间把”这个点估计到底有多不确定”量化了出来，用两组区间是否大幅重叠，就能判断当前数据是否足以支撑”两者存在真实差异”这个结论，避免仅凭一次抽样的数字大小就下结论。</p>
+<p><strong>踩过的坑</strong>：区间重叠 ≠ “两者真实值相等的概率大”。重叠说明的是<strong>数据不够信息量去区分</strong>。真要比较谁更好，得直接对两个后验做差值推断（比如采样算 <code>P(θ_A &gt; θ_B)</code>），不是看区间重不重叠。</p>
+<p><strong>关联概念</strong>：二项似然（success&#x2F;fail 型实验的似然函数）</p>
+<h3 id="paired-comparison-vs-unpaired"><a href="#paired-comparison-vs-unpaired" class="headerlink" title="paired comparison vs unpaired"></a>paired comparison vs unpaired</h3><h3 id="样本量与统计功效"><a href="#样本量与统计功效" class="headerlink" title="样本量与统计功效"></a>样本量与统计功效</h3>]]></content>
+      <categories>
+        <category>学习笔记</category>
+      </categories>
+      <tags>
+        <tag>Deep Learning</tag>
+        <tag>Training</tag>
+        <tag>Evaluation</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>【学习笔记】VTLA相关概念总结</title>
     <url>/2026/09/01/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91VTLA%E7%9B%B8%E5%85%B3%E6%A6%82%E5%BF%B5%E6%80%BB%E7%BB%93/</url>
     <content><![CDATA[<h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><ul>
@@ -328,104 +429,251 @@
       </tags>
   </entry>
   <entry>
-    <title>【学习笔记】训练与评估</title>
-    <url>/2026/09/15/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/</url>
-    <content><![CDATA[<h2 id="1-模型与优化（Optimization）"><a href="#1-模型与优化（Optimization）" class="headerlink" title="1. 模型与优化（Optimization）"></a>1. 模型与优化（Optimization）</h2><h3 id="EMA（指数移动平均）"><a href="#EMA（指数移动平均）" class="headerlink" title="EMA（指数移动平均）"></a>EMA（指数移动平均）</h3><p><strong>定义</strong>：训练时除了梯度下降正常更新的参数 <code>θ_t</code>，额外维护一份影子参数 <code>θ_shadow</code>，它跟着真实参数走，但更新得更慢，不参与反向传播，只是被动更新：</p>
-<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">θ_shadow = decay * θ_shadow + (<span class="number">1</span> - decay) * θ_t</span><br></pre></td></tr></table></figure>
+    <title>【散记】PE考核探索报告</title>
+    <url>/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/</url>
+    <content><![CDATA[<h1 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h1><p>该考核为上海创智学院2025夏令营入营前考核</p>
+<p><br>考核聚焦于利用 <strong>提示词工程（PE）</strong> 使大语言模型解决推荐系统中的重排任务。考生将获得一个验证集文件(附件:val.jsonl)，该文牛中每行代表一条数据，是一个用户的历史电影观看记录。这些数据模拟了真实世界中推荐系统面临的场景，即根据用户历史行为预测用户下一步可能的兴趣点。</p>
+<p><br>在推荐系统中，<strong>重排(Re-ranking)</strong> 是推荐流程的关键环节，它直接影响用户体验和推荐效果。本次考核旨在考察考生运用提示词工程技术引导大语言模型完成这一重排任务的能力，考生需要分析用户的历史观影行为，从中挖掘用户偏好特征，并将这些信息合理地融入提示词中，使大语言模型能够对候选电影进行准确排序。</p>
+<h1 id="PE推荐重排任务探索报告"><a href="#PE推荐重排任务探索报告" class="headerlink" title="PE推荐重排任务探索报告"></a>PE推荐重排任务探索报告</h1><h2 id="1-编写初始-construct-prompt-和-parse-output-函数"><a href="#1-编写初始-construct-prompt-和-parse-output-函数" class="headerlink" title="1. 编写初始 construct_prompt 和 parse_output 函数"></a>1. 编写初始 construct_prompt 和 parse_output 函数</h2><h3 id="1-1-construct-prompt"><a href="#1-1-construct-prompt" class="headerlink" title="1.1 construct_prompt"></a>1.1 construct_prompt</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取用户历史观影记录</span></span><br><span class="line">    history_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(history_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统，需要根据用户的观影历史，预测用户可能喜欢的电影并排序。</span></span><br><span class="line"><span class="string">请仔细分析用户的历史观影记录，理解用户的观影偏好，然后对候选电影列表进行重新排序。</span></span><br><span class="line"><span class="string">输出时只需返回电影ID列表，不要包含任何解释或额外文本。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户历史观影记录(按时间排序，越靠下越近期，越近期的题材说明越受用户关注):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请根据用户观影历史，对上述候选电影进行重新排序，将用户最可能喜欢的电影排在最前面。</span></span><br><span class="line"><span class="string">只需返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]，不要包含其他任何内容。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
+<h3 id="1-2-parse-output"><a href="#1-2-parse-output" class="headerlink" title="1.2 parse_output"></a>1.2 parse_output</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">parse_output</span>(<span class="params">text</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    解析大语言模型的输出文本，提取推荐重排列表</span></span><br><span class="line"><span class="string">    参数：text (str)：大语言模型的输出文本</span></span><br><span class="line"><span class="string">    返回：从输出文本解析出的电影ID列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 尝试直接解析JSON格式的输出</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># 去除可能的Markdown代码块标记</span></span><br><span class="line">        clean_text = text.replace(<span class="string">&quot;```json&quot;</span>, <span class="string">&quot;&quot;</span>).replace(<span class="string">&quot;```&quot;</span>, <span class="string">&quot;&quot;</span>).strip()</span><br><span class="line">        <span class="keyword">return</span> json.loads(clean_text)</span><br><span class="line">    <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">        <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 尝试解析方括号括起来的列表</span></span><br><span class="line">    <span class="keyword">if</span> <span class="string">&quot;[&quot;</span> <span class="keyword">in</span> text <span class="keyword">and</span> <span class="string">&quot;]&quot;</span> <span class="keyword">in</span> text:</span><br><span class="line">        start = text.index(<span class="string">&quot;[&quot;</span>)</span><br><span class="line">        end = text.index(<span class="string">&quot;]&quot;</span>) + <span class="number">1</span></span><br><span class="line">        list_str = text[start:end]</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            <span class="keyword">return</span> json.loads(list_str)</span><br><span class="line">        <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">            <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 更宽松的解析方式 - 提取所有数字ID</span></span><br><span class="line">    ids = re.findall(<span class="string">r&#x27;\b\d+\b&#x27;</span>, text)</span><br><span class="line">    <span class="keyword">return</span> [<span class="built_in">int</span>(<span class="built_in">id</span>) <span class="keyword">for</span> <span class="built_in">id</span> <span class="keyword">in</span> ids]</span><br></pre></td></tr></table></figure>
 
-<p><code>decay</code> 一般取 0.999。</p>
-<p><strong>为什么重要</strong>：eval 时用 <code>θ_shadow</code> 通常比用最后一步的 <code>θ_t</code> 更稳定、泛化更好，因为 shadow 参数相当于把训练后期的参数抖动做了平均。</p>
-<p><strong>踩过的坑</strong>：最初以为 <code>use_ema</code> 是可选的性能优化，后来发现有的官方基准（比如 lerobot&#x2F;diffusion_pusht）反而没开这个选项，说明它不是”越复杂越好”，要看具体基准配置。</p>
-<p><strong>关联概念</strong>：<code>batch_size</code>（同样影响训练稳定性）、图像增强（同样服务于泛化）</p>
-<hr>
-<h3 id="batch-size-批次大小"><a href="#batch-size-批次大小" class="headerlink" title="batch size (批次大小)"></a>batch size (批次大小)</h3><p><strong>定义</strong>：模型每处理完一个 batch（一批样本）就计算一次梯度、更新一次参数，这批样本的数量就是 <code>batch size</code>。它决定了每次参数更新时，梯度是基于多少个样本的信息综合出来的。</p>
-<p><strong>为什么重要</strong>：<code>batch size</code> 越大，单次梯度估计包含的样本信息越多、噪声越小，梯度方向更稳定，同样步数下往往能达到更好的效果；但代价是显存占用随 <code>batch size</code> 线性增长，过大会直接导致 OOM。另外 <code>batch size</code> 和学习率不是独立的——<code>batch size</code> 变大后梯度噪声变小，通常需要相应调大学习率（linear scaling rule），否则同样的学习率会显得”步子迈得太小”，收敛变慢。</p>
-<p><strong>踩过的坑</strong>：如果目标是复现某个 baseline，<code>batch size</code> 必须和原始设置对齐，而不能只对齐 <code>steps</code> 数——因为两者共同决定了模型实际”看过”多少样本（有效训练量 ≈ <code>batch_size × steps</code>）。</p>
-<p><strong>关联概念</strong>：EMA（<code>batch size</code> 影响梯度噪声，间接影响 shadow 参数的平滑效果是否必要）、学习率调度（<code>batch size</code> 变化时学习率通常要联动调整）</p>
-<hr>
-<h3 id="学习率调度（warmup、cosine-decay…）"><a href="#学习率调度（warmup、cosine-decay…）" class="headerlink" title="学习率调度（warmup、cosine decay…）"></a>学习率调度（warmup、cosine decay…）</h3><p><strong>定义</strong>：动态调整学习率。最常见的组合是「warmup + cosine decay」：训练最初的若干步，学习率从一个很小的值线性增长到设定的峰值（warmup）；之后再按余弦函数的形状，从峰值逐渐衰减到接近 0（cosine decay）。</p>
-<p><strong>为什么重要</strong>：训练刚开始时参数是随机初始化的，梯度方向往往很不准，如果一上来就用较大的学习率，容易在初期就把参数带偏甚至训练发散，所以需要 warmup 先”热身”；而训练后期参数已经比较接近最优点，需要用小学习率做精细调整，否则容易在最优点附近来回震荡而无法收敛，这就是 decay 阶段的作用。</p>
-<p><strong>踩过的坑</strong>：训练时第一次设置 <code>steps</code> 为100k，训练结束后加载last checkpoint并更改 <code>steps</code> 为200k继续训练，此时 <code>loss曲线</code> 会呈现波动（如下图）。</p>
-<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/loss.png" style="height:400px" /></center>
+<h2 id="2-编写测试与评估程序"><a href="#2-编写测试与评估程序" class="headerlink" title="2. 编写测试与评估程序"></a>2. 编写测试与评估程序</h2><p>编写可运行的测试与评估程序，用于验证大语言模型的推荐重排效果。<br>程序流程如下：</p>
+<ol>
+<li>从数据文件中读取一条数据</li>
+<li>调用construct_prompt函数，构造提示词</li>
+<li>调用大语言模型的API（使用DeepSeek-V3），获取大语言模型的输出</li>
+<li>调用parse_output函数，解析大语言模型的输出</li>
+<li>将解析出的电影ID列表与原始数据中的电影ID列表进行比较，计算单个样本的NDCG@k性能</li>
+<li>重复1-5步，将每个样本的NDCG@k性能累加取平均，得到最终的评估结果</li>
+</ol>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"><span class="keyword">import</span> json</span><br><span class="line"><span class="keyword">import</span> re</span><br><span class="line"><span class="keyword">import</span> math</span><br><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取用户历史观影记录</span></span><br><span class="line">    history_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(history_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统，需要根据用户的观影历史，预测用户可能喜欢的电影并排序。</span></span><br><span class="line"><span class="string">请仔细分析用户的历史观影记录，理解用户的观影偏好，然后对候选电影列表进行重新排序。</span></span><br><span class="line"><span class="string">输出时只需返回电影ID列表，不要包含任何解释或额外文本。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户历史观影记录(按时间排序，越靠下越近期，越近期的题材说明越受用户关注):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请根据用户观影历史，对上述候选电影进行重新排序，将用户最可能喜欢的电影排在最前面。</span></span><br><span class="line"><span class="string">只需返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]，不要包含其他任何内容。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">parse_output</span>(<span class="params">text</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    解析大语言模型的输出文本，提取推荐重排列表</span></span><br><span class="line"><span class="string">    参数：text (str)：大语言模型的输出文本</span></span><br><span class="line"><span class="string">    返回：从输出文本解析出的电影ID列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 尝试直接解析JSON格式的输出</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># 去除可能的Markdown代码块标记</span></span><br><span class="line">        clean_text = text.replace(<span class="string">&quot;```json&quot;</span>, <span class="string">&quot;&quot;</span>).replace(<span class="string">&quot;```&quot;</span>, <span class="string">&quot;&quot;</span>).strip()</span><br><span class="line">        <span class="keyword">return</span> json.loads(clean_text)</span><br><span class="line">    <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">        <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 尝试解析方括号括起来的列表</span></span><br><span class="line">    <span class="keyword">if</span> <span class="string">&quot;[&quot;</span> <span class="keyword">in</span> text <span class="keyword">and</span> <span class="string">&quot;]&quot;</span> <span class="keyword">in</span> text:</span><br><span class="line">        start = text.index(<span class="string">&quot;[&quot;</span>)</span><br><span class="line">        end = text.index(<span class="string">&quot;]&quot;</span>) + <span class="number">1</span></span><br><span class="line">        list_str = text[start:end]</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            <span class="keyword">return</span> json.loads(list_str)</span><br><span class="line">        <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">            <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 更宽松的解析方式 - 提取所有数字ID</span></span><br><span class="line">    ids = re.findall(<span class="string">r&#x27;\b\d+\b&#x27;</span>, text)</span><br><span class="line">    <span class="keyword">return</span> [<span class="built_in">int</span>(<span class="built_in">id</span>) <span class="keyword">for</span> <span class="built_in">id</span> <span class="keyword">in</span> ids]</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">calculate_ndcg_for_sample</span>(<span class="params">predicted_list, ground_truth_item, k=<span class="number">10</span></span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    计算单个样本的NDCG@k</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    参数：</span></span><br><span class="line"><span class="string">    predicted_list: 模型预测的电影ID排序列表 [id1, id2, id3, ...]</span></span><br><span class="line"><span class="string">    ground_truth_item: 用户实际观看的下一部电影ID</span></span><br><span class="line"><span class="string">    k: NDCG@k中的k取值</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    返回：</span></span><br><span class="line"><span class="string">    ndcg: NDCG@k分数</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 截取前k个预测结果</span></span><br><span class="line">    predicted_list = predicted_list[:k]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算相关性分数列表</span></span><br><span class="line">    relevance = []</span><br><span class="line">    <span class="keyword">for</span> item_id <span class="keyword">in</span> predicted_list:</span><br><span class="line">        <span class="keyword">if</span> item_id == ground_truth_item:</span><br><span class="line">            relevance.append(<span class="number">1</span>)  <span class="comment"># 相关项</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            relevance.append(<span class="number">0</span>)  <span class="comment"># 不相关项</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算DCG@k</span></span><br><span class="line">    dcg = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> i, rel <span class="keyword">in</span> <span class="built_in">enumerate</span>(relevance):</span><br><span class="line">        <span class="comment"># 位置i的折损因子为log2(i+2)</span></span><br><span class="line">        discount = math.log2(i + <span class="number">2</span>)</span><br><span class="line">        dcg += rel / discount</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算IDCG@k</span></span><br><span class="line">    <span class="comment"># 在本任务中，理想情况是将唯一相关项放在第一位</span></span><br><span class="line">    idcg = <span class="number">1</span> / math.log2(<span class="number">1</span> + <span class="number">1</span>)  <span class="comment"># = 1</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算NDCG@k</span></span><br><span class="line">    <span class="keyword">if</span> idcg &gt; <span class="number">0</span>:</span><br><span class="line">        ndcg = dcg / idcg</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        ndcg = <span class="number">0</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> ndcg</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&#x27;__main__&#x27;</span>:</span><br><span class="line">    <span class="comment"># 读取全部数据并处理</span></span><br><span class="line">    client = OpenAI(api_key=<span class="string">&quot;sk-fd65************63f8f5567&quot;</span>, base_url=<span class="string">&quot;https://api.deepseek.com&quot;</span>)</span><br><span class="line">    </span><br><span class="line">    total_ndcg = <span class="number">0</span>  <span class="comment"># 总NDCG分数</span></span><br><span class="line">    sample_count = <span class="number">0</span>  <span class="comment"># 成功处理的样本数</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&quot;val.jsonl&quot;</span>) <span class="keyword">as</span> f:</span><br><span class="line">        <span class="keyword">for</span> line <span class="keyword">in</span> f:</span><br><span class="line">            <span class="comment"># 解析每一行的 JSON 数据</span></span><br><span class="line">            data = json.loads(line.strip())</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">try</span>:</span><br><span class="line">                response = client.chat.completions.create(</span><br><span class="line">                    model=<span class="string">&quot;deepseek-chat&quot;</span>,</span><br><span class="line">                    temperature=<span class="number">0.0</span>,</span><br><span class="line">                    messages=construct_prompt(data),</span><br><span class="line">                    stream=<span class="literal">False</span></span><br><span class="line">                )</span><br><span class="line">                </span><br><span class="line">                result = response.choices[<span class="number">0</span>].message.content</span><br><span class="line">                predicted_list = parse_output(result)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">&quot;解析结果:&quot;</span>, predicted_list)</span><br><span class="line">                </span><br><span class="line">                <span class="comment"># 正确提取 target_item 的 ID</span></span><br><span class="line">                ground_truth_item = data[<span class="string">&quot;target_item&quot;</span>][<span class="number">0</span>]  <span class="comment"># 数组的第一个元素</span></span><br><span class="line">                ndcg = calculate_ndcg_for_sample(predicted_list, ground_truth_item, k=<span class="number">10</span>)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;NDCG@10 = <span class="subst">&#123;ndcg&#125;</span>&quot;</span>)</span><br><span class="line">                </span><br><span class="line">                <span class="comment"># 累加NDCG分数</span></span><br><span class="line">                total_ndcg += ndcg</span><br><span class="line">                sample_count += <span class="number">1</span></span><br><span class="line">                </span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;当前平均NDCG@10 = <span class="subst">&#123;total_ndcg / sample_count:<span class="number">.4</span>f&#125;</span>&quot;</span>)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">&quot;-&quot;</span> * <span class="number">50</span>)</span><br><span class="line">                </span><br><span class="line">            <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;处理数据时出现错误: <span class="subst">&#123;e&#125;</span>&quot;</span>)</span><br><span class="line">                <span class="keyword">continue</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 输出最终的平均NDCG分数</span></span><br><span class="line">    <span class="keyword">if</span> sample_count &gt; <span class="number">0</span>:</span><br><span class="line">        final_avg_ndcg = total_ndcg / sample_count</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;\n===== 最终评估结果 =====&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;总样本数: <span class="subst">&#123;sample_count&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;平均NDCG@10: <span class="subst">&#123;final_avg_ndcg:<span class="number">.4</span>f&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure>
+<p>运行脚本可以得到目前函数版本的评估结果，下图为初始版本的终端部分输出截图：</p>
+<center><img class="inline-img" src="/../img/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/0.5431.png" style="height:500px" /></center>
+可以观察到平均NDCG@10为0.5431，说明模型在推荐重排上有一定的效果。但需要进一步优化模型，以获得更好的推荐效果。
 
-<p>排查后发现，原因在于学习率调度是按照「当前 step &#x2F; step 总数」这个比例来计算 <code>衰减进度</code> 的——第一次训练时，调度器以为总共只训 100k 步，所以在接近 100k 步时学习率已经衰减到很低；续训时把总步数改成了 200k，调度器重新按新的总步数计算衰减进度，导致学习率在续训起点被重新”拉高”了一截，直接反映成 loss 曲线在衔接处的波动。<code>learning rate</code> 曲线证实了这一点：</p>
-<center><img class="inline-img" src="/../img/%E3%80%90%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E3%80%91%E8%AE%AD%E7%BB%83%E4%B8%8E%E8%AF%84%E4%BC%B0/lr.png" style="height:400px" /></center>
+<h2 id="3-提示词优化"><a href="#3-提示词优化" class="headerlink" title="3. 提示词优化"></a>3. 提示词优化</h2><p>想提升大语言模型的推荐重排效果，应从提示词入手，也就是修改construct_prompt()函数。</p>
+<h3 id="3-1-第一次有效修改"><a href="#3-1-第一次有效修改" class="headerlink" title="3.1 第一次有效修改"></a>3.1 第一次有效修改</h3><p>从输出可以分析出如下几个问题与优化思路：</p>
+<ol>
+<li>NDCG 分数波动比较大（从 0 到 1），说明模型的推荐并不够稳定。</li>
+<li>目前的编写的系统提示不够简洁有逻辑，可以尝试用列点的方式与大模型交互。</li>
+<li>为让模型更关注近期兴趣，可以单独列出最近7部电影，同时保留完整历史，用于分析长期偏好。</li>
+<li>将用户提示信息分成三个清晰的部分，突出展示最近的观影记录，并明确指出需要关注用户兴趣的变化。</li>
+</ol>
+<p>修改后的函数如下：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取最近的5部电影作为重点关注</span></span><br><span class="line">    recent_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>][-<span class="number">7</span>:]]</span><br><span class="line">    recent_str = <span class="string">&quot;\n&quot;</span>.join(recent_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取所有历史记录来分析整体偏好</span></span><br><span class="line">    all_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(all_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统。你的任务是:</span></span><br><span class="line"><span class="string">1. 首先分析用户最近观看的7部电影，找出用户的当前兴趣点</span></span><br><span class="line"><span class="string">2. 然后参考用户的整体观影历史，了解用户的长期偏好</span></span><br><span class="line"><span class="string">3. 将这两个因素结合起来，对候选电影进行排序</span></span><br><span class="line"><span class="string">4. 确保推荐的电影与用户最近的观影偏好高度相关</span></span><br><span class="line"><span class="string">输出格式：只返回排序后的电影ID列表，不要包含任何解释。&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户最近观看的7部电影（按时间从旧到新排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;recent_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">用户完整的观影历史（按时间排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">待排序的候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请仔细分析用户的观影偏好，特别注意最近观看的电影所展现的兴趣变化，对候选电影进行排序。</span></span><br><span class="line"><span class="string">直接返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
+<p>运行测试与评估脚本后终端部分输出截图如下：</p>
+<center><img class="inline-img" src="/../img/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/0.6398.png" style="height:500px" /></center>
+反复运行进行测试，可以发现该版本函数的评估结果有所提升，多次平均NDCG@10从0.53提升到0.62。
 
-<p><strong>关联概念</strong>：batch size（<code>steps</code> 和 <code>batch size</code> 共同决定有效训练量，调度器的衰减进度是按 <code>steps</code> 而非样本数计算的）、优化器（不同优化器对学习率的敏感度不同，Adam 类优化器相对更能容忍学习率的波动）</p>
-<hr>
-<h3 id="优化器（Adam、SGD、AdamW等）"><a href="#优化器（Adam、SGD、AdamW等）" class="headerlink" title="优化器（Adam、SGD、AdamW等）"></a>优化器（Adam、SGD、AdamW等）</h3><p><strong>定义</strong>：优化器决定了「已经算出梯度之后，具体怎么用这个梯度去更新参数」。几种常见优化器的核心区别：</p>
-<ul>
-<li><strong>SGD</strong>：最朴素的方式，直接用当前梯度乘以学习率去更新参数：<code>θ = θ - lr × grad</code>。梯度里有多少噪声，更新方向就带多少噪声，容易震荡。</li>
-<li><strong>Momentum（动量法）</strong>：不直接用当前梯度更新，而是维护一个”历史梯度的指数移动平均”（和 EMA 的思路是一致的），让更新方向更平滑，减少震荡，也能在梯度方向一致的维度上加速收敛。</li>
-<li><strong>Adam</strong>：在 Momentum 的基础上，再对每个参数维度维护一份”梯度平方的指数移动平均”，用它来给每个参数各自的学习率做自适应缩放——梯度一直很大的方向，实际步长会被适当调小；梯度一直很小的方向，步长会被适当放大。这让 Adam 对学习率的初始设置相对没那么敏感，也是它成为深度学习默认选择的原因之一。</li>
-<li><strong>AdamW</strong>：和 Adam 几乎一样，唯一区别是把权重衰减（weight decay，一种防止过拟合的正则化手段）从梯度更新公式里解耦出来，直接作用在参数上，而不是先混进梯度里再一起做自适应缩放。这样权重衰减的力度不会被 Adam 的自适应机制意外放大或缩小，效果更符合预期，现在大多数 Transformer &#x2F; 扩散模型的训练都默认用 AdamW。</li>
-</ul>
-<p><strong>为什么重要</strong>：扩散模型的训练目标（预测噪声）本身梯度噪声就比较大，Adam &#x2F; AdamW 这类自适应优化器能让训练在不用非常精细调学习率的情况下也能稳定收敛，这也是为什么这类模型的官方实现里几乎都默认用 AdamW，而不是 SGD。</p>
-<p><strong>关联概念</strong>：学习率调度（优化器和调度器是配合工作的两个模块，调度器决定学习率的”基准值”随时间怎么变，优化器决定每个参数实际拿到的”有效学习率”怎么自适应缩放）、EMA（Momentum 和 EMA 用的是同一种指数移动平均的数学工具，只是作用对象不同——一个平滑梯度，一个平滑参数）</p>
-<hr>
-<h3 id="step-epoch-batch：监督学习-vs-RL-的含义差别"><a href="#step-epoch-batch：监督学习-vs-RL-的含义差别" class="headerlink" title="step &#x2F; epoch &#x2F; batch：监督学习 vs RL 的含义差别"></a>step &#x2F; epoch &#x2F; batch：监督学习 vs RL 的含义差别</h3><p><strong>定义</strong>：</p>
-<ul>
-<li>监督学习 &#x2F; SFT &#x2F; 模仿学习：数据固定。step &#x3D; 一次参数更新；epoch &#x3D; 过一遍整个数据集；batch size &#x3D; 每次更新用的样本数。</li>
-<li>RL（以 SB3 的 PPO 为例）：数据由当前策略采样产生。<ul>
-<li><code>n_steps</code>：每个环境一次收集多少步环境交互</li>
-<li><code>n_envs</code>：并行环境数。一次 rollout 的样本数 &#x3D; n_steps × n_envs</li>
-<li><code>batch_size</code>：从这批样本里切 minibatch 的大小</li>
-<li><code>n_epochs</code>：这批新数据重复用几遍，用完即弃</li>
-<li><code>total_timesteps</code>：总共要和环境交互多少步（决定采样几轮）</li>
-</ul>
-</li>
-<li>每轮参数更新次数 &#x3D; n_epochs × (n_steps × n_envs ÷ batch_size)</li>
-<li>采样轮数 ≈ total_timesteps ÷ (n_steps × n_envs)</li>
-</ul>
-<p><strong>为什么重要</strong>：RL 里的 step 有歧义，既可能是环境步，也可能是参数更新步。读论文或文档时先看它的单位。另外，”rollout” 有时指一条完整轨迹（trajectory），有时指一批收集的步数据。</p>
-<p><strong>踩过的坑</strong>：RL 里 loss 下降不等于变好，因为数据分布随策略在变，要看 <code>ep_rew_mean</code> 等回报指标。</p>
-<p><strong>关联概念</strong>：batch size（监督学习版）、学习率调度（RL 里按 total_timesteps 算进度）、Beta 后验（RL 评估同样需要考虑方差）</p>
-<h2 id="2-数据与正则化（Data-Regularization）"><a href="#2-数据与正则化（Data-Regularization）" class="headerlink" title="2. 数据与正则化（Data &amp; Regularization）"></a>2. 数据与正则化（Data &amp; Regularization）</h2><p>概念只要和”怎么防止模型死记硬背训练集”有关，都进这里</p>
-<ul>
-<li><p>图像增强</p>
-</li>
-<li><p>Dropout</p>
-</li>
-<li><p>Weight decay</p>
-</li>
-<li><p>数据归一化 &#x2F; normalization</p>
-</li>
-<li><p>（以后遇到新的都加在这）</p>
-</li>
-</ul>
-<h2 id="3-训练诊断（Diagnostics）"><a href="#3-训练诊断（Diagnostics）" class="headerlink" title="3. 训练诊断（Diagnostics）"></a>3. 训练诊断（Diagnostics）</h2><p>概念只要和”训练过程中该看什么信号来判断训得好不好”有关</p>
-<ul>
-<li>loss 曲线的陷阱（plateau ≠ 收敛）</li>
-<li>过拟合 &#x2F; 欠拟合的信号</li>
-<li>梯度消失&#x2F;爆炸</li>
-<li>（以后遇到新的都加在这）</li>
-</ul>
-<h2 id="4-评估与实验设计（Evaluation-Experimental-Design）"><a href="#4-评估与实验设计（Evaluation-Experimental-Design）" class="headerlink" title="4. 评估与实验设计（Evaluation &amp; Experimental Design）"></a>4. 评估与实验设计（Evaluation &amp; Experimental Design）</h2><h3 id="Beta-后验-可信区间"><a href="#Beta-后验-可信区间" class="headerlink" title="Beta 后验 &#x2F; 可信区间"></a>Beta 后验 &#x2F; 可信区间</h3><p><strong>定义</strong>：</p>
-<ul>
-<li>首先解释先验&#x2F;后验：<ul>
-<li>先验 (prior)：看到数据前，对某个未知量的概率分布假设。</li>
-<li>后验 (posterior)：结合数据后，更新出来的新的概率分布。</li>
-</ul>
-</li>
-<li>beta 分布：定义在 [0,1] 上的分布，专门用来描述”未知的概率&#x2F;比例”（比如真实成功率），由两个参数控制形状。</li>
-<li>beta 后验：Beta 分布是二项似然的<strong>共轭先验</strong>——先验 <code>Beta(α,β)</code>，观测到 n 次实验 k 次成功后，后验就是 <code>Beta(α+k, β+n-k)</code>，闭式解，不用采样。从最无信息的 <code>Beta(1,1)</code> 出发，后验就是 <code>Beta(k+1, n-k+1)</code>。<ul>
-<li>“先验是 Beta 分布 Beta(α, β) + 似然是伯努利&#x2F;二项分布” 这个特定组合,才保证后验一定是 Beta(α+k, β+n-k)。</li>
-</ul>
-</li>
-<li>置信区间 (confidence interval): 频率学派。真实值是固定的，<strong>区间才是随机的</strong>——“重复抽样很多次，这些区间里大约 n% 会包住真实值”。</li>
-<li>可信区间 (credible interval): 贝叶斯。真实值本身被当作随机变量，直接从后验分布切一刀——“真实值有 n% 的可能落在这个区间内”。（这个概念更易懂一些）</li>
-</ul>
-<p><strong>为什么重要</strong>：小样本对照实验里，不能只比较两个点估计的大小（比如 47% vs 43%），因为样本量小的时候，点估计本身的抽样噪声可能远大于这个差距。可信区间把”这个点估计到底有多不确定”量化了出来，用两组区间是否大幅重叠，就能判断当前数据是否足以支撑”两者存在真实差异”这个结论，避免仅凭一次抽样的数字大小就下结论。</p>
-<p><strong>踩过的坑</strong>：区间重叠 ≠ “两者真实值相等的概率大”。重叠说明的是<strong>数据不够信息量去区分</strong>。真要比较谁更好，得直接对两个后验做差值推断（比如采样算 <code>P(θ_A &gt; θ_B)</code>），不是看区间重不重叠。</p>
-<p><strong>关联概念</strong>：二项似然（success&#x2F;fail 型实验的似然函数）</p>
-<h3 id="paired-comparison-vs-unpaired"><a href="#paired-comparison-vs-unpaired" class="headerlink" title="paired comparison vs unpaired"></a>paired comparison vs unpaired</h3><h3 id="样本量与统计功效"><a href="#样本量与统计功效" class="headerlink" title="样本量与统计功效"></a>样本量与统计功效</h3>]]></content>
+<h3 id="3-2-第二次有效修改"><a href="#3-2-第二次有效修改" class="headerlink" title="3.2 第二次有效修改"></a>3.2 第二次有效修改</h3><p>评估结果仍有较大上升空间，因此选择继续进行优化。通过分析数据与输出可以得出如下几个问题与优化思路：</p>
+<ol>
+<li>当前模型太过关注最近的观影记录，忽视了用户的整体观影趋势。</li>
+<li>提示词不够简洁，可能影响大语言模型的分析，可以对表述进行压缩，减少冗余。</li>
+</ol>
+<p>修改后的函数如下：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取最近的5部电影作为重点关注</span></span><br><span class="line">    recent_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>][-<span class="number">5</span>:]]</span><br><span class="line">    recent_str = <span class="string">&quot;\n&quot;</span>.join(recent_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取所有历史记录来分析整体偏好</span></span><br><span class="line">    all_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(all_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统。你的任务是:</span></span><br><span class="line"><span class="string">1. 首先分析用户最近和长期观看过的电影，找出用户的最近和长期的兴趣点</span></span><br><span class="line"><span class="string">2. 对候选电影按照“用户最可能下一部观看的电影”进行排序</span></span><br><span class="line"><span class="string">3. 确保推荐的电影与用户最近的观影偏好高度相关</span></span><br><span class="line"><span class="string">输出格式：只返回排序后的电影ID列表，不要包含任何解释。&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户最近观看的5部电影（按时间从旧到新排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;recent_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">用户完整的观影历史（按时间排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">待排序的候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请仔细分析用户的观影偏好，特别注意最近观看的电影所展现的兴趣变化，对候选电影进行排序。</span></span><br><span class="line"><span class="string">直接返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
+<p>多次运行测试与评估脚本后，可以发现评估结果与稳定性有较大提升，平均NDCG@10基本能稳定在0.70左右。<br><br>其中最好一次评估结果达0.7204，终端部分输出截图如下：</p>
+<center><img class="inline-img" src="/../img/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/0.7204.png" style="height:500px" /></center>
+
+<h3 id="3-3-其它修改与评估"><a href="#3-3-其它修改与评估" class="headerlink" title="3.3 其它修改与评估"></a>3.3 其它修改与评估</h3><p>在第二次有效修改后，我也进行了多种其它尝试，但效果不如第二次有效修改的版本。<br><br>例如，我尝试使用英文编写提示词，表达与最佳中文提示词版本相同的含义，探索DeepSeek-V3模型对中英文提示词的解析差异。编写函数如下：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取最近的5部电影作为重点关注</span></span><br><span class="line">    recent_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>][-<span class="number">5</span>:]]</span><br><span class="line">    recent_str = <span class="string">&quot;\n&quot;</span>.join(recent_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取所有历史记录来分析整体偏好</span></span><br><span class="line">    all_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(all_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;You are a professional movie recommendation system. Your tasks are:</span></span><br><span class="line"><span class="string">1. Analyze the user&#x27;s recent and long-term watched movies to identify their interests.</span></span><br><span class="line"><span class="string">2. Rank the candidate movies based on &quot;the movie the user is most likely to watch next.&quot;</span></span><br><span class="line"><span class="string">3. Ensure the recommended movies are highly relevant to the user&#x27;s recent viewing preferences.</span></span><br><span class="line"><span class="string">Output format: Return only the ranked list of movie IDs, without any explanations.&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;The user&#x27;s recently watched 5 movies (sorted from oldest to newest):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;recent_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">The user&#x27;s complete viewing history (sorted by time):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">The list of candidate movies to be ranked:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">Please carefully analyze the user&#x27;s viewing preferences, paying special attention to the changes in interests shown in the recently watched movies, and rank the candidate movies.</span></span><br><span class="line"><span class="string">Directly return the ranked list of movie IDs in the format [ID1, ID2, ID3,...]&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
+<p>多次运行测试与评估脚本，发现英文提示词的效果（平均NDCG@10）稍逊于中文提示词，且稳定性也落后于中文提示词。这可能是由于DeepSeek-V3模型对英文提示词的解析能力不如中文提示词。因此还是选择之前的最佳版本进行提交。</p>
+]]></content>
       <categories>
-        <category>学习笔记</category>
+        <category>散记</category>
       </categories>
       <tags>
-        <tag>Deep Learning</tag>
-        <tag>Training</tag>
-        <tag>Evaluation</tag>
+        <tag>Prompt Engineering</tag>
+        <tag>summer camp</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>【论文笔记】3DGS精读</title>
+    <url>/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/</url>
+    <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br></p>
+<p>项目网页链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/</a></p>
+<p>论文链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf</a></p>
+<p>源代码链接：<a href="https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file">https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file</a></p>
+<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><strong>contributions：</strong></p>
+<ol>
+<li>提出<strong>各向异性的3D高斯</strong>作为辐射场的高质量、非结构化表示</li>
+<li>提出3D高斯属性的优化方法，以及<strong>自适应密度控制</strong>（为高质量表达场景）</li>
+<li>提出的算法<strong>适应快速GPU计算</strong>（cuda kernel）的方法，支持各向异性高斯的泼溅和快速的反向传播算法执行，快速生成新视角（*重要）</li>
+</ol>
+<p>1+2 优化场景的算法</p>
+<p>3 优化渲染速度的方法</p>
+<h1 id="3DGS"><a href="#3DGS" class="headerlink" title="3DGS"></a>3DGS</h1><h2 id="overview"><a href="#overview" class="headerlink" title="overview"></a>overview</h2><p>输入：一组静态照片+<strong>SfM估计的相机姿态与点云</strong></p>
+<p>选用高斯原因：各向异性体积可用于紧凑地表示精细结构</p>
+<p>用点云初始化高斯:</p>
+<p><strong>高斯性质：mean（位置），covariance（形状），opacity（不透明度）</strong></p>
+<p>各向异性的颜色可用<strong>球谐函数（SH）</strong>表示</p>
+<p>通过<strong>3dgs优化参数+高斯密度的自适应控制操作</strong>来创建可以表示场景的辐射场</p>
+<p><strong>提速</strong>的关键：<strong>Gaussians用GPU基数排序</strong></p>
+<p>流程图：</p>
+<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%B5%81%E7%A8%8B%E5%9B%BE.png" alt="截屏2024-09-19 23.39.18.png"></p>
+<h2 id="可微的3dgs（构建高斯）"><a href="#可微的3dgs（构建高斯）" class="headerlink" title="可微的3dgs（构建高斯）"></a>可微的3dgs（构建高斯）</h2><p>为什么选择Gaussians：可微+方便投影成2D（可以快速α混合）</p>
+<h3 id="概率密度函数"><a href="#概率密度函数" class="headerlink" title="概率密度函数"></a>概率密度函数</h3><p>3D Gaussian公式：</p>
+<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/3dgs%E5%85%AC%E5%BC%8F.png" alt="公式1.png"></p>
+<p>PS：x为坐标矩阵；Σ为协方差矩阵。公式里的 x 是相对 mean（μ）的偏移，因此公式中省略了 μ；μ 是单独存的属性，Σ 只描述形状。</p>
+<h3 id="投影"><a href="#投影" class="headerlink" title="投影"></a>投影</h3><p>投影公式：</p>
+<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%8A%95%E5%BD%B1%E5%85%AC%E5%BC%8F.png" alt="公式1.png"></p>
+<!-- $$
+\sum ' = J W \; \Sigma \; W ^ { T } \; J ^ { T }
+$$ -->
+
+<p>因<strong>协方差矩阵Σ中的数据有范围限制</strong>，梯度下降算法易更新出无效协方差矩阵。</p>
+<p>解决方法：</p>
+<p>不直接优化 Σ，而是把它分解为<strong>缩放 s（3 维向量，椭球三个轴的长度）</strong>和<strong>旋转 q（四元数，椭球朝向）</strong>，<br>优化 s 和 q，再构造 Σ &#x3D; R S Sᵀ Rᵀ（R 由 q 得到，S &#x3D; diag(s)）。</p>
+<p>这样构造出的 Σ 一定是合法的半正定矩阵。</p>
+<h3 id="渲染时如何使用：alpha-blending"><a href="#渲染时如何使用：alpha-blending" class="headerlink" title="渲染时如何使用：alpha-blending"></a>渲染时如何使用：alpha-blending</h3><p>高斯先投影到屏幕，得到屏幕空间的 2D 高斯。<br>对每个像素，将重叠的 N 个高斯按深度从前往后混合：</p>
+<center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/alphablending%E5%85%AC%E5%BC%8F.png" style="height:80px" /></center>
+
+<p>（与 NeRF 成像模型相同，只是 αᵢ 的来源不同。）</p>
+<ul>
+<li>cᵢ：颜色，由 SH 按当前视角算出，换视角会变。</li>
+<li>αᵢ &#x3D; oᵢ · Gᵢ²ᴰ(x)：2D 高斯在像素处的值乘以可学习不透明度。<ul>
+<li>oᵢ：可学习不透明度，整个高斯上都一样，不随视角变（符号为自拟，论文未单独命名）。</li>
+<li>Gᵢ²ᴰ(x)：3D 高斯投影后在像素 x 处的值，中心最大（&#x3D;1），向边缘指数衰减，随像素位置和视角变化。</li>
+</ul>
+</li>
+<li>G 调制的是不透明度（混合权重），不是颜色：中心不是”颜色最深”，而是”贡献最大”。</li>
+</ul>
+<h2 id="3dgs自适应密度控制优化（优化高斯）"><a href="#3dgs自适应密度控制优化（优化高斯）" class="headerlink" title="3dgs自适应密度控制优化（优化高斯）"></a>3dgs自适应密度控制优化（优化高斯）</h2><p>不同位置3dgs密度不同 需要除点云初始化外的密度控制优化</p>
+<p><strong>需优化：μ，Σ，α，SH；密度（前后二者相关联）</strong></p>
+<ul>
+<li><h3 id="优化"><a href="#优化" class="headerlink" title="优化"></a>优化</h3><p>  用<strong>SGD</strong>（随机梯度下降）优化，支持定制的cuda kernel</p>
+<p>  用<strong>sigmoid激活函数</strong>优化α，<strong>指数激活函数</strong>优化Σ的scale，以限制数据范围</p>
+<p>  初始化Σ（正实数*identity matrix）使得高斯为<strong>各向同性高斯</strong>，即分布密度值仅与到均值距离有关、与方向无关</p>
+<p>  以距离最近的三个点（SfM生成的点云）为标准生成初始化高斯</p>
+<p>  用<strong>标准指数衰减调度</strong>优化μ</p>
+<p>  生成图片对比目标图片的<strong>loss</strong>由<strong>D-SSIM</strong>（衡量两幅图片相似性的算法）得到：<br>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%88%AA%E5%B1%8F2024-09-21%2017.30.39.png" alt="公式2.png"></p>
+  <!-- $$
+  \mathcal{L} = (1 - \lambda)\mathcal{L}_1 + \lambda\mathcal{L}_{D-SSIM}
+  $$ -->
+<p>  PS：实验中λ取0.2。这是训练用的 loss。评估时用的是 PSNR &#x2F; SSIM &#x2F; LPIPS，见「结果评估」。</p>
+</li>
+<li><h3 id="自适应高斯控制"><a href="#自适应高斯控制" class="headerlink" title="自适应高斯控制"></a>自适应高斯控制</h3><p>  用稀疏点云初始化出的高斯很稀疏，需控制单位体积中的高斯数量</p>
+<p>  预优化后，每100次迭代densify一次，并<strong>删除所有α值小于一个极小阈值的高斯</strong></p>
+<p>  关注<strong>高斯覆盖率极低（under-reconstruction）和单个高斯极大（over-reconstruction）</strong>的位置，因还原度低，此类位置<strong>视图-空间位置梯度</strong>很大</p>
+<p>  因此设置<strong>视图-空间位置梯度阈值</strong>（实验中取0.0002），超过阈值则需densify，优化过程如下图：</p>
+  <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E8%87%B4%E5%AF%86%E5%8C%96%E6%96%B9%E6%B3%95.png" style="height:300px" /></center>
+  
+<p>  如图，对于欠重构处，<strong>克隆</strong>一个高斯并向位置梯度方向移动。</p>
+<p>  对于过重构处，<strong>分裂</strong>该高斯。新高斯的scale因子由实验得到（实验中取1.6），位置由原高斯作为采样PDF来确定。</p>
+<p>  在视图中占比过大的高斯可能由于距相机过近或本身过大，会定期被清除，以保证画面质量、控制高斯总数。</p>
+</li>
+</ul>
+<h2 id="高斯的快速可微光栅化器（fast-3D→2D）"><a href="#高斯的快速可微光栅化器（fast-3D→2D）" class="headerlink" title="高斯的快速可微光栅化器（fast 3D→2D）"></a>高斯的快速可微光栅化器（fast 3D→2D）</h2><p>提速对象：投影渲染+高斯的快排（排相对视点的前后顺序，为了α混合）</p>
+<h3 id="该光栅化器特点："><a href="#该光栅化器特点：" class="headerlink" title="该光栅化器特点："></a>该光栅化器特点：</h3><ol>
+<li>为提速，先将所有高斯排序（距视点距离的顺序），再进行视角渲染；而非针对视角渲染的每个像素进行高斯排序</li>
+<li>支持高效反向传播算法</li>
+<li>内存占用小，每个像素固定占用一部分</li>
+<li><strong>光栅化管线可微</strong>，可投影各向异性高斯</li>
+</ol>
+<h3 id="渲染管线："><a href="#渲染管线：" class="headerlink" title="渲染管线："></a>渲染管线：</h3><ol>
+<li><p>将屏幕<strong>分成多个16*16像素的瓦片（tiles）</strong></p>
+</li>
+<li><p>进行<strong>视锥体剔除（frustum culling）</strong>，以确定在视图范围内的高斯（只保留与视锥体相交99%置信区间的高斯）</p>
+ <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E8%A7%86%E9%94%A5%E4%BD%93.png" style="height:250px" /></center>
+ </li>
+<li><p>再用一个<strong>防护带（guard band）</strong>去除位置过偏的高斯（eg. 过于靠后或过于靠近前剪裁面）</p>
+</li>
+<li><p>根据覆盖的瓦片数<strong>将每个高斯实例化</strong>，并给每个实例分配一个<strong>key</strong>，包含其<strong>在视图空间中的深度信息</strong>和<strong>覆盖的瓦片编号信息</strong></p>
+</li>
+<li><p>基于key，使用<strong>GPU上的高效基数排序（fast GPU Radix sort）</strong>对高斯进行排序；后续渲染都基于这个顺序（可能会有瑕疵，但微不足道，速度更重要）</p>
+</li>
+<li><p>根据顺序（通过识别相对当下视点的最近高斯与最远高斯）<strong>为每个瓦片生成高斯序列</strong>，并为<strong>每个瓦片启动一个线程块</strong> —— 即每一瓦片共享一序列，因此瓦片大小选择为重要指标</p>
+</li>
+<li><p>每一线程块将该瓦片对应的高斯序列加载进该块的<strong>共享存储器</strong>；对于块中每个像素，<strong>从前往后遍历共享序列进行α-blending</strong>（最大化并行增益），<strong>累积至该像素的α达目标饱和度（唯一停止标准），停止遍历</strong></p>
+</li>
+<li><p>以一定频率检查线程块中每个线程情况，当16*16个像素都饱和，该线程块收束</p>
+</li>
+<li><p>渲染出图像后计算loss、反向传播、优化参数……</p>
+<p> 特别地：</p>
+<ul>
+<li>此方法不限制接收梯度更新的基本体数量，因此可灵活处理各类场景，无需特别调整</li>
+<li>反向传播时，为减少动态内存开销，从后至前再次遍历所在瓦片对应高斯序列</li>
+<li>α代表该高斯对像素颜色的影响程度，因此可以决定该高斯从loss得到多少梯度指令</li>
+</ul>
+</li>
+</ol>
+<h1 id="结果和总结"><a href="#结果和总结" class="headerlink" title="结果和总结"></a>结果和总结</h1><h2 id="结果评估"><a href="#结果评估" class="headerlink" title="结果评估"></a>结果评估</h2><p>pros：训练速度快，效果好</p>
+<p>cons：内存占用大（高斯太多（eg. 200k~500k），每个高斯的参数也多）</p>
+<p>尤其对比Nerf</p>
+<center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E7%BB%93%E6%9E%9C%E5%AF%B9%E6%AF%94.png" style="height:200px" /></center>
+
+<p>论文用三个指标比较渲染结果和真实照片（评估用的测试视角<strong>不参与训练</strong>）：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>衡量什么</th>
+<th>方向</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PSNR</td>
+<td>逐像素的误差（基于均方误差）</td>
+<td>越高越好</td>
+</tr>
+<tr>
+<td>SSIM</td>
+<td>结构相似性（亮度、对比度、结构）</td>
+<td>越高越好</td>
+</tr>
+<tr>
+<td>LPIPS</td>
+<td>用预训练网络提取特征后的感知差异，更贴近人眼</td>
+<td><strong>越低</strong>越好</td>
+</tr>
+</tbody></table>
+<p><strong>注意：这三个指标和训练 loss 不是一回事。</strong> 训练 loss 是 L1 + D-SSIM（见上文），要对 θ 求梯度来更新参数；评估指标只用来<strong>打分</strong>，不参与训练。</p>
+<h2 id="消融实验（ablation-study）"><a href="#消融实验（ablation-study）" class="headerlink" title="消融实验（ablation study）"></a>消融实验（ablation study）</h2><p>即评估不同条件&#x2F;参数等因素对于结果的影响的实验</p>
+<ul>
+<li><h3 id="关于SfM"><a href="#关于SfM" class="headerlink" title="关于SfM"></a>关于SfM</h3><p>  实验对比了 <strong>用随机抽样初始化高斯 和 用SfM点云初始化高斯</strong> 得出的结果：</p>
+  <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/SfM%E5%AF%B9%E6%AF%94.png" style="height:400px" /></center>
+  
+<p>  渲染结果大体都不错，但前者会有画面细节问题，可能是由于有无法删除的漂浮物。</p>
+<p>  PS：SfM仅为一种估计方法，无法达到准确程度，后续研究若有更好方式，会提升效果。</p>
+</li>
+<li><h3 id="关于致密化（Densification）"><a href="#关于致密化（Densification）" class="headerlink" title="关于致密化（Densification）"></a>关于致密化（Densification）</h3><p>  实验对比了 <strong>通过克隆控制密度</strong>、<strong>通过分裂控制密度</strong> 和 <strong>通过克隆&amp;分裂控制密度</strong>（见2.3） 三种密度控制方式的结果：</p>
+  <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E8%87%B4%E5%AF%86%E5%8C%96%E5%AF%B9%E6%AF%94.png" style="height:500px" /></center>
+  
+<p>  只克隆可能会出现类似迷雾的画面表现，只分裂可能会丢失细节，结合起来效果最好。</p>
+</li>
+<li><h3 id="对接收梯度的高斯数限制（靠后的高斯是否要变）"><a href="#对接收梯度的高斯数限制（靠后的高斯是否要变）" class="headerlink" title="对接收梯度的高斯数限制（靠后的高斯是否要变）"></a>对接收梯度的高斯数限制（靠后的高斯是否要变）</h3><p>  因后面的高斯对像素影响小（即使其α值较高），且不考虑靠后高斯可以提速，实验对比了 <strong>限制每个像素只有靠前的10个高斯接收梯度（左）</strong> 和 <strong>前文所述方法（右）</strong> 所得结果：</p>
+  <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E5%89%8D10%E4%B8%AA%E9%AB%98%E6%96%AF%E5%AF%B9%E6%AF%94.png" style="height:250px" /></center>
+  
+<p>  限制靠后高斯的调整对最终效果是有影响的。这可能说明靠前高斯们的α值都不大，不足以覆盖靠后的高斯发挥作用。</p>
+</li>
+<li><h3 id="关于各向异性协方差"><a href="#关于各向异性协方差" class="headerlink" title="关于各向异性协方差"></a>关于各向异性协方差</h3><p>  实验对比了 <strong>使用各向异性协方差矩阵定义高斯</strong> 和 <strong>使用各向同性的一个r</strong>（减小内存占用）定义高斯 所得结果：</p>
+  <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E5%90%84%E5%90%91%E5%BC%82%E6%80%A7%E5%AF%B9%E6%AF%94.png" style="height:200px" /></center>
+  
+<p>  对比表明使用各向异性协方差矩阵图像呈现效果确实更好。</p>
+</li>
+<li><h3 id="关于球谐函数"><a href="#关于球谐函数" class="headerlink" title="关于球谐函数"></a>关于球谐函数</h3><p>  球谐函数的引入提高不同视角渲染质量</p>
+</li>
+</ul>
+<h2 id="不足（技术不足与效果不足）"><a href="#不足（技术不足与效果不足）" class="headerlink" title="不足（技术不足与效果不足）"></a>不足（技术不足与效果不足）</h2><ol>
+<li>未充分观察到的区域中会有<strong>artifacts（瑕疵、错误）</strong>（可能由于SfM初始化）</li>
+<li>某些区域会生成错误的长条形或“斑点状”的高斯</li>
+<li>实时渲染中可能会出错，体积大的高斯突然霸屏等（可能由于防护带草率地拒绝了部分高斯）</li>
+<li>过于简单的可见性算法</li>
+<li>未使用针对loss的正则化（添加惩罚项以防止模型过拟合）</li>
+<li>内存占用大（待优化）</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>3dgs是第一个用辐射场实现实时渲染的方法。</p>
+<p>目前<strong>只有光栅化例程在优化的cuda kernel中实现</strong>，我们期望剩余的优化也可以移植到cuda中。</p>
+<p><strong>mesh（网格）</strong>在应用领域中占重要分量，因传统方法渲染更快，市场份额占比极大。因此将3dgs技术生成的高斯转为游戏制作等场景中需要的网格也是重要研究方向。</p>
+<p>此文中没有呈现的<strong>3D高斯分布可视化展示</strong>，对理解高斯的规律、优化算法，可能有很大帮助。</p>
+]]></content>
+      <categories>
+        <category>论文笔记</category>
+      </categories>
+      <tags>
+        <tag>CG</tag>
+        <tag>paper</tag>
+        <tag>neural-rendering</tag>
       </tags>
   </entry>
   <entry>
@@ -541,249 +789,6 @@
       <tags>
         <tag>paper</tag>
         <tag>collaborative perception</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【散记】PE考核探索报告</title>
-    <url>/2025/05/14/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/</url>
-    <content><![CDATA[<h1 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h1><p>该考核为上海创智学院2025夏令营入营前考核</p>
-<p><br>考核聚焦于利用 <strong>提示词工程（PE）</strong> 使大语言模型解决推荐系统中的重排任务。考生将获得一个验证集文件(附件:val.jsonl)，该文牛中每行代表一条数据，是一个用户的历史电影观看记录。这些数据模拟了真实世界中推荐系统面临的场景，即根据用户历史行为预测用户下一步可能的兴趣点。</p>
-<p><br>在推荐系统中，<strong>重排(Re-ranking)</strong> 是推荐流程的关键环节，它直接影响用户体验和推荐效果。本次考核旨在考察考生运用提示词工程技术引导大语言模型完成这一重排任务的能力，考生需要分析用户的历史观影行为，从中挖掘用户偏好特征，并将这些信息合理地融入提示词中，使大语言模型能够对候选电影进行准确排序。</p>
-<h1 id="PE推荐重排任务探索报告"><a href="#PE推荐重排任务探索报告" class="headerlink" title="PE推荐重排任务探索报告"></a>PE推荐重排任务探索报告</h1><h2 id="1-编写初始-construct-prompt-和-parse-output-函数"><a href="#1-编写初始-construct-prompt-和-parse-output-函数" class="headerlink" title="1. 编写初始 construct_prompt 和 parse_output 函数"></a>1. 编写初始 construct_prompt 和 parse_output 函数</h2><h3 id="1-1-construct-prompt"><a href="#1-1-construct-prompt" class="headerlink" title="1.1 construct_prompt"></a>1.1 construct_prompt</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取用户历史观影记录</span></span><br><span class="line">    history_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(history_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统，需要根据用户的观影历史，预测用户可能喜欢的电影并排序。</span></span><br><span class="line"><span class="string">请仔细分析用户的历史观影记录，理解用户的观影偏好，然后对候选电影列表进行重新排序。</span></span><br><span class="line"><span class="string">输出时只需返回电影ID列表，不要包含任何解释或额外文本。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户历史观影记录(按时间排序，越靠下越近期，越近期的题材说明越受用户关注):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请根据用户观影历史，对上述候选电影进行重新排序，将用户最可能喜欢的电影排在最前面。</span></span><br><span class="line"><span class="string">只需返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]，不要包含其他任何内容。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
-<h3 id="1-2-parse-output"><a href="#1-2-parse-output" class="headerlink" title="1.2 parse_output"></a>1.2 parse_output</h3><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">parse_output</span>(<span class="params">text</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    解析大语言模型的输出文本，提取推荐重排列表</span></span><br><span class="line"><span class="string">    参数：text (str)：大语言模型的输出文本</span></span><br><span class="line"><span class="string">    返回：从输出文本解析出的电影ID列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 尝试直接解析JSON格式的输出</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># 去除可能的Markdown代码块标记</span></span><br><span class="line">        clean_text = text.replace(<span class="string">&quot;```json&quot;</span>, <span class="string">&quot;&quot;</span>).replace(<span class="string">&quot;```&quot;</span>, <span class="string">&quot;&quot;</span>).strip()</span><br><span class="line">        <span class="keyword">return</span> json.loads(clean_text)</span><br><span class="line">    <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">        <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 尝试解析方括号括起来的列表</span></span><br><span class="line">    <span class="keyword">if</span> <span class="string">&quot;[&quot;</span> <span class="keyword">in</span> text <span class="keyword">and</span> <span class="string">&quot;]&quot;</span> <span class="keyword">in</span> text:</span><br><span class="line">        start = text.index(<span class="string">&quot;[&quot;</span>)</span><br><span class="line">        end = text.index(<span class="string">&quot;]&quot;</span>) + <span class="number">1</span></span><br><span class="line">        list_str = text[start:end]</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            <span class="keyword">return</span> json.loads(list_str)</span><br><span class="line">        <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">            <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 更宽松的解析方式 - 提取所有数字ID</span></span><br><span class="line">    ids = re.findall(<span class="string">r&#x27;\b\d+\b&#x27;</span>, text)</span><br><span class="line">    <span class="keyword">return</span> [<span class="built_in">int</span>(<span class="built_in">id</span>) <span class="keyword">for</span> <span class="built_in">id</span> <span class="keyword">in</span> ids]</span><br></pre></td></tr></table></figure>
-
-<h2 id="2-编写测试与评估程序"><a href="#2-编写测试与评估程序" class="headerlink" title="2. 编写测试与评估程序"></a>2. 编写测试与评估程序</h2><p>编写可运行的测试与评估程序，用于验证大语言模型的推荐重排效果。<br>程序流程如下：</p>
-<ol>
-<li>从数据文件中读取一条数据</li>
-<li>调用construct_prompt函数，构造提示词</li>
-<li>调用大语言模型的API（使用DeepSeek-V3），获取大语言模型的输出</li>
-<li>调用parse_output函数，解析大语言模型的输出</li>
-<li>将解析出的电影ID列表与原始数据中的电影ID列表进行比较，计算单个样本的NDCG@k性能</li>
-<li>重复1-5步，将每个样本的NDCG@k性能累加取平均，得到最终的评估结果</li>
-</ol>
-<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"><span class="keyword">import</span> json</span><br><span class="line"><span class="keyword">import</span> re</span><br><span class="line"><span class="keyword">import</span> math</span><br><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取用户历史观影记录</span></span><br><span class="line">    history_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(history_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统，需要根据用户的观影历史，预测用户可能喜欢的电影并排序。</span></span><br><span class="line"><span class="string">请仔细分析用户的历史观影记录，理解用户的观影偏好，然后对候选电影列表进行重新排序。</span></span><br><span class="line"><span class="string">输出时只需返回电影ID列表，不要包含任何解释或额外文本。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户历史观影记录(按时间排序，越靠下越近期，越近期的题材说明越受用户关注):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请根据用户观影历史，对上述候选电影进行重新排序，将用户最可能喜欢的电影排在最前面。</span></span><br><span class="line"><span class="string">只需返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]，不要包含其他任何内容。&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">parse_output</span>(<span class="params">text</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    解析大语言模型的输出文本，提取推荐重排列表</span></span><br><span class="line"><span class="string">    参数：text (str)：大语言模型的输出文本</span></span><br><span class="line"><span class="string">    返回：从输出文本解析出的电影ID列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 尝试直接解析JSON格式的输出</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># 去除可能的Markdown代码块标记</span></span><br><span class="line">        clean_text = text.replace(<span class="string">&quot;```json&quot;</span>, <span class="string">&quot;&quot;</span>).replace(<span class="string">&quot;```&quot;</span>, <span class="string">&quot;&quot;</span>).strip()</span><br><span class="line">        <span class="keyword">return</span> json.loads(clean_text)</span><br><span class="line">    <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">        <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 尝试解析方括号括起来的列表</span></span><br><span class="line">    <span class="keyword">if</span> <span class="string">&quot;[&quot;</span> <span class="keyword">in</span> text <span class="keyword">and</span> <span class="string">&quot;]&quot;</span> <span class="keyword">in</span> text:</span><br><span class="line">        start = text.index(<span class="string">&quot;[&quot;</span>)</span><br><span class="line">        end = text.index(<span class="string">&quot;]&quot;</span>) + <span class="number">1</span></span><br><span class="line">        list_str = text[start:end]</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            <span class="keyword">return</span> json.loads(list_str)</span><br><span class="line">        <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">            <span class="keyword">pass</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 更宽松的解析方式 - 提取所有数字ID</span></span><br><span class="line">    ids = re.findall(<span class="string">r&#x27;\b\d+\b&#x27;</span>, text)</span><br><span class="line">    <span class="keyword">return</span> [<span class="built_in">int</span>(<span class="built_in">id</span>) <span class="keyword">for</span> <span class="built_in">id</span> <span class="keyword">in</span> ids]</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">calculate_ndcg_for_sample</span>(<span class="params">predicted_list, ground_truth_item, k=<span class="number">10</span></span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    计算单个样本的NDCG@k</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    参数：</span></span><br><span class="line"><span class="string">    predicted_list: 模型预测的电影ID排序列表 [id1, id2, id3, ...]</span></span><br><span class="line"><span class="string">    ground_truth_item: 用户实际观看的下一部电影ID</span></span><br><span class="line"><span class="string">    k: NDCG@k中的k取值</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    返回：</span></span><br><span class="line"><span class="string">    ndcg: NDCG@k分数</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 截取前k个预测结果</span></span><br><span class="line">    predicted_list = predicted_list[:k]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算相关性分数列表</span></span><br><span class="line">    relevance = []</span><br><span class="line">    <span class="keyword">for</span> item_id <span class="keyword">in</span> predicted_list:</span><br><span class="line">        <span class="keyword">if</span> item_id == ground_truth_item:</span><br><span class="line">            relevance.append(<span class="number">1</span>)  <span class="comment"># 相关项</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            relevance.append(<span class="number">0</span>)  <span class="comment"># 不相关项</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算DCG@k</span></span><br><span class="line">    dcg = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> i, rel <span class="keyword">in</span> <span class="built_in">enumerate</span>(relevance):</span><br><span class="line">        <span class="comment"># 位置i的折损因子为log2(i+2)</span></span><br><span class="line">        discount = math.log2(i + <span class="number">2</span>)</span><br><span class="line">        dcg += rel / discount</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算IDCG@k</span></span><br><span class="line">    <span class="comment"># 在本任务中，理想情况是将唯一相关项放在第一位</span></span><br><span class="line">    idcg = <span class="number">1</span> / math.log2(<span class="number">1</span> + <span class="number">1</span>)  <span class="comment"># = 1</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 计算NDCG@k</span></span><br><span class="line">    <span class="keyword">if</span> idcg &gt; <span class="number">0</span>:</span><br><span class="line">        ndcg = dcg / idcg</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        ndcg = <span class="number">0</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> ndcg</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&#x27;__main__&#x27;</span>:</span><br><span class="line">    <span class="comment"># 读取全部数据并处理</span></span><br><span class="line">    client = OpenAI(api_key=<span class="string">&quot;sk-fd65************63f8f5567&quot;</span>, base_url=<span class="string">&quot;https://api.deepseek.com&quot;</span>)</span><br><span class="line">    </span><br><span class="line">    total_ndcg = <span class="number">0</span>  <span class="comment"># 总NDCG分数</span></span><br><span class="line">    sample_count = <span class="number">0</span>  <span class="comment"># 成功处理的样本数</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&quot;val.jsonl&quot;</span>) <span class="keyword">as</span> f:</span><br><span class="line">        <span class="keyword">for</span> line <span class="keyword">in</span> f:</span><br><span class="line">            <span class="comment"># 解析每一行的 JSON 数据</span></span><br><span class="line">            data = json.loads(line.strip())</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">try</span>:</span><br><span class="line">                response = client.chat.completions.create(</span><br><span class="line">                    model=<span class="string">&quot;deepseek-chat&quot;</span>,</span><br><span class="line">                    temperature=<span class="number">0.0</span>,</span><br><span class="line">                    messages=construct_prompt(data),</span><br><span class="line">                    stream=<span class="literal">False</span></span><br><span class="line">                )</span><br><span class="line">                </span><br><span class="line">                result = response.choices[<span class="number">0</span>].message.content</span><br><span class="line">                predicted_list = parse_output(result)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">&quot;解析结果:&quot;</span>, predicted_list)</span><br><span class="line">                </span><br><span class="line">                <span class="comment"># 正确提取 target_item 的 ID</span></span><br><span class="line">                ground_truth_item = data[<span class="string">&quot;target_item&quot;</span>][<span class="number">0</span>]  <span class="comment"># 数组的第一个元素</span></span><br><span class="line">                ndcg = calculate_ndcg_for_sample(predicted_list, ground_truth_item, k=<span class="number">10</span>)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;NDCG@10 = <span class="subst">&#123;ndcg&#125;</span>&quot;</span>)</span><br><span class="line">                </span><br><span class="line">                <span class="comment"># 累加NDCG分数</span></span><br><span class="line">                total_ndcg += ndcg</span><br><span class="line">                sample_count += <span class="number">1</span></span><br><span class="line">                </span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;当前平均NDCG@10 = <span class="subst">&#123;total_ndcg / sample_count:<span class="number">.4</span>f&#125;</span>&quot;</span>)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">&quot;-&quot;</span> * <span class="number">50</span>)</span><br><span class="line">                </span><br><span class="line">            <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;处理数据时出现错误: <span class="subst">&#123;e&#125;</span>&quot;</span>)</span><br><span class="line">                <span class="keyword">continue</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 输出最终的平均NDCG分数</span></span><br><span class="line">    <span class="keyword">if</span> sample_count &gt; <span class="number">0</span>:</span><br><span class="line">        final_avg_ndcg = total_ndcg / sample_count</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;\n===== 最终评估结果 =====&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;总样本数: <span class="subst">&#123;sample_count&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;平均NDCG@10: <span class="subst">&#123;final_avg_ndcg:<span class="number">.4</span>f&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure>
-<p>运行脚本可以得到目前函数版本的评估结果，下图为初始版本的终端部分输出截图：</p>
-<center><img class="inline-img" src="/../img/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/0.5431.png" style="height:500px" /></center>
-可以观察到平均NDCG@10为0.5431，说明模型在推荐重排上有一定的效果。但需要进一步优化模型，以获得更好的推荐效果。
-
-<h2 id="3-提示词优化"><a href="#3-提示词优化" class="headerlink" title="3. 提示词优化"></a>3. 提示词优化</h2><p>想提升大语言模型的推荐重排效果，应从提示词入手，也就是修改construct_prompt()函数。</p>
-<h3 id="3-1-第一次有效修改"><a href="#3-1-第一次有效修改" class="headerlink" title="3.1 第一次有效修改"></a>3.1 第一次有效修改</h3><p>从输出可以分析出如下几个问题与优化思路：</p>
-<ol>
-<li>NDCG 分数波动比较大（从 0 到 1），说明模型的推荐并不够稳定。</li>
-<li>目前的编写的系统提示不够简洁有逻辑，可以尝试用列点的方式与大模型交互。</li>
-<li>为让模型更关注近期兴趣，可以单独列出最近7部电影，同时保留完整历史，用于分析长期偏好。</li>
-<li>将用户提示信息分成三个清晰的部分，突出展示最近的观影记录，并明确指出需要关注用户兴趣的变化。</li>
-</ol>
-<p>修改后的函数如下：</p>
-<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取最近的5部电影作为重点关注</span></span><br><span class="line">    recent_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>][-<span class="number">7</span>:]]</span><br><span class="line">    recent_str = <span class="string">&quot;\n&quot;</span>.join(recent_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取所有历史记录来分析整体偏好</span></span><br><span class="line">    all_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(all_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统。你的任务是:</span></span><br><span class="line"><span class="string">1. 首先分析用户最近观看的7部电影，找出用户的当前兴趣点</span></span><br><span class="line"><span class="string">2. 然后参考用户的整体观影历史，了解用户的长期偏好</span></span><br><span class="line"><span class="string">3. 将这两个因素结合起来，对候选电影进行排序</span></span><br><span class="line"><span class="string">4. 确保推荐的电影与用户最近的观影偏好高度相关</span></span><br><span class="line"><span class="string">输出格式：只返回排序后的电影ID列表，不要包含任何解释。&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户最近观看的7部电影（按时间从旧到新排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;recent_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">用户完整的观影历史（按时间排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">待排序的候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请仔细分析用户的观影偏好，特别注意最近观看的电影所展现的兴趣变化，对候选电影进行排序。</span></span><br><span class="line"><span class="string">直接返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
-<p>运行测试与评估脚本后终端部分输出截图如下：</p>
-<center><img class="inline-img" src="/../img/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/0.6398.png" style="height:500px" /></center>
-反复运行进行测试，可以发现该版本函数的评估结果有所提升，多次平均NDCG@10从0.53提升到0.62。
-
-<h3 id="3-2-第二次有效修改"><a href="#3-2-第二次有效修改" class="headerlink" title="3.2 第二次有效修改"></a>3.2 第二次有效修改</h3><p>评估结果仍有较大上升空间，因此选择继续进行优化。通过分析数据与输出可以得出如下几个问题与优化思路：</p>
-<ol>
-<li>当前模型太过关注最近的观影记录，忽视了用户的整体观影趋势。</li>
-<li>提示词不够简洁，可能影响大语言模型的分析，可以对表述进行压缩，减少冗余。</li>
-</ol>
-<p>修改后的函数如下：</p>
-<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取最近的5部电影作为重点关注</span></span><br><span class="line">    recent_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>][-<span class="number">5</span>:]]</span><br><span class="line">    recent_str = <span class="string">&quot;\n&quot;</span>.join(recent_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取所有历史记录来分析整体偏好</span></span><br><span class="line">    all_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(all_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;你是一个专业的电影推荐系统。你的任务是:</span></span><br><span class="line"><span class="string">1. 首先分析用户最近和长期观看过的电影，找出用户的最近和长期的兴趣点</span></span><br><span class="line"><span class="string">2. 对候选电影按照“用户最可能下一部观看的电影”进行排序</span></span><br><span class="line"><span class="string">3. 确保推荐的电影与用户最近的观影偏好高度相关</span></span><br><span class="line"><span class="string">输出格式：只返回排序后的电影ID列表，不要包含任何解释。&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;用户最近观看的5部电影（按时间从旧到新排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;recent_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">用户完整的观影历史（按时间排序）:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">待排序的候选电影列表:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">请仔细分析用户的观影偏好，特别注意最近观看的电影所展现的兴趣变化，对候选电影进行排序。</span></span><br><span class="line"><span class="string">直接返回排序后的电影ID列表，格式为[ID1, ID2, ID3,...]&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
-<p>多次运行测试与评估脚本后，可以发现评估结果与稳定性有较大提升，平均NDCG@10基本能稳定在0.70左右。<br><br>其中最好一次评估结果达0.7204，终端部分输出截图如下：</p>
-<center><img class="inline-img" src="/../img/%E3%80%90%E6%95%A3%E8%AE%B0%E3%80%91PE%E8%80%83%E6%A0%B8%E6%8E%A2%E7%B4%A2%E6%8A%A5%E5%91%8A/0.7204.png" style="height:500px" /></center>
-
-<h3 id="3-3-其它修改与评估"><a href="#3-3-其它修改与评估" class="headerlink" title="3.3 其它修改与评估"></a>3.3 其它修改与评估</h3><p>在第二次有效修改后，我也进行了多种其它尝试，但效果不如第二次有效修改的版本。<br><br>例如，我尝试使用英文编写提示词，表达与最佳中文提示词版本相同的含义，探索DeepSeek-V3模型对中英文提示词的解析差异。编写函数如下：</p>
-<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">construct_prompt</span>(<span class="params">d</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    构造用于大语言模型的提示词</span></span><br><span class="line"><span class="string">    参数：d (dict)：json数据文件的一行，解析成字典后的变量</span></span><br><span class="line"><span class="string">    返回：OpenAI API的message格式列表</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 提取最近的5部电影作为重点关注</span></span><br><span class="line">    recent_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>][-<span class="number">5</span>:]]</span><br><span class="line">    recent_str = <span class="string">&quot;\n&quot;</span>.join(recent_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取所有历史记录来分析整体偏好</span></span><br><span class="line">    all_movies = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;item_list&quot;</span>]]</span><br><span class="line">    history_str = <span class="string">&quot;\n&quot;</span>.join(all_movies)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 提取候选电影列表</span></span><br><span class="line">    candidates = [<span class="string">f&quot;<span class="subst">&#123;movie[<span class="number">1</span>]&#125;</span>(ID:<span class="subst">&#123;movie[<span class="number">0</span>]&#125;</span>)&quot;</span> <span class="keyword">for</span> movie <span class="keyword">in</span> d[<span class="string">&quot;candidates&quot;</span>]]</span><br><span class="line">    candidates_str = <span class="string">&quot;\n&quot;</span>.join(candidates)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 构造系统提示</span></span><br><span class="line">    system_prompt = <span class="string">&quot;&quot;&quot;You are a professional movie recommendation system. Your tasks are:</span></span><br><span class="line"><span class="string">1. Analyze the user&#x27;s recent and long-term watched movies to identify their interests.</span></span><br><span class="line"><span class="string">2. Rank the candidate movies based on &quot;the movie the user is most likely to watch next.&quot;</span></span><br><span class="line"><span class="string">3. Ensure the recommended movies are highly relevant to the user&#x27;s recent viewing preferences.</span></span><br><span class="line"><span class="string">Output format: Return only the ranked list of movie IDs, without any explanations.&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 构造用户提示</span></span><br><span class="line">    user_prompt = <span class="string">f&quot;&quot;&quot;The user&#x27;s recently watched 5 movies (sorted from oldest to newest):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;recent_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">The user&#x27;s complete viewing history (sorted by time):</span></span><br><span class="line"><span class="string"><span class="subst">&#123;history_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">The list of candidate movies to be ranked:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;candidates_str&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">Please carefully analyze the user&#x27;s viewing preferences, paying special attention to the changes in interests shown in the recently watched movies, and rank the candidate movies.</span></span><br><span class="line"><span class="string">Directly return the ranked list of movie IDs in the format [ID1, ID2, ID3,...]&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;system&quot;</span>, <span class="string">&quot;content&quot;</span>: system_prompt&#125;,</span><br><span class="line">        &#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: user_prompt&#125;</span><br><span class="line">    ]</span><br></pre></td></tr></table></figure>
-<p>多次运行测试与评估脚本，发现英文提示词的效果（平均NDCG@10）稍逊于中文提示词，且稳定性也落后于中文提示词。这可能是由于DeepSeek-V3模型对英文提示词的解析能力不如中文提示词。因此还是选择之前的最佳版本进行提交。</p>
-]]></content>
-      <categories>
-        <category>散记</category>
-      </categories>
-      <tags>
-        <tag>Prompt Engineering</tag>
-        <tag>summer camp</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>【论文笔记】3DGS精读</title>
-    <url>/2024/09/21/%E3%80%90%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0%E3%80%913DGS%E7%B2%BE%E8%AF%BB/</url>
-    <content><![CDATA[<p><strong>3D Gaussian Splatting for Real-Time Radiance Field Rendering 论文精读笔记</strong><br></p>
-<p>项目网页链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/</a></p>
-<p>论文链接：<a href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf">https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_high.pdf</a></p>
-<p>源代码链接：<a href="https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file">https://github.com/graphdeco-inria/gaussian-splatting?tab=readme-ov-file</a></p>
-<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><strong>contributions：</strong></p>
-<ol>
-<li>提出<strong>各向异性的3D高斯</strong>作为辐射场的高质量、非结构化表示</li>
-<li>提出3D高斯属性的优化方法，以及<strong>自适应密度控制</strong>（为高质量表达场景）</li>
-<li>提出的算法<strong>适应快速GPU计算</strong>（cuda kernel）的方法，支持各向异性高斯的泼溅和快速的反向传播算法执行，快速生成新视角（*重要）</li>
-</ol>
-<p>1+2 优化场景的算法</p>
-<p>3 优化渲染速度的方法</p>
-<h1 id="3DGS"><a href="#3DGS" class="headerlink" title="3DGS"></a>3DGS</h1><h2 id="overview"><a href="#overview" class="headerlink" title="overview"></a>overview</h2><p>输入：一组静态照片+<strong>SfM估计的相机姿态与点云</strong></p>
-<p>选用高斯原因：各向异性体积可用于紧凑地表示精细结构</p>
-<p>用点云初始化高斯:</p>
-<p><strong>高斯性质：mean（位置），covariance（形状），opacity（不透明度）</strong></p>
-<p>各向异性的颜色可用<strong>球谐函数（SH）</strong>表示</p>
-<p>通过<strong>3dgs优化参数+高斯密度的自适应控制操作</strong>来创建可以表示场景的辐射场</p>
-<p><strong>提速</strong>的关键：<strong>Gaussians用GPU基数排序</strong></p>
-<p>流程图：</p>
-<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%B5%81%E7%A8%8B%E5%9B%BE.png" alt="截屏2024-09-19 23.39.18.png"></p>
-<h2 id="可微的3dgs（构建高斯）"><a href="#可微的3dgs（构建高斯）" class="headerlink" title="可微的3dgs（构建高斯）"></a>可微的3dgs（构建高斯）</h2><p>为什么选择Gaussians：可微+方便投影成2D（可以快速α混合）</p>
-<h3 id="概率密度函数"><a href="#概率密度函数" class="headerlink" title="概率密度函数"></a>概率密度函数</h3><p>3D Gaussian公式：</p>
-<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/3dgs%E5%85%AC%E5%BC%8F.png" alt="公式1.png"></p>
-<p>PS：x为坐标矩阵；Σ为协方差矩阵。公式里的 x 是相对 mean（μ）的偏移，因此公式中省略了 μ；μ 是单独存的属性，Σ 只描述形状。</p>
-<h3 id="投影"><a href="#投影" class="headerlink" title="投影"></a>投影</h3><p>投影公式：</p>
-<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%8A%95%E5%BD%B1%E5%85%AC%E5%BC%8F.png" alt="公式1.png"></p>
-<!-- $$
-\sum ' = J W \; \Sigma \; W ^ { T } \; J ^ { T }
-$$ -->
-
-<p>因<strong>协方差矩阵Σ中的数据有范围限制</strong>，梯度下降算法易更新出无效协方差矩阵。</p>
-<p>解决方法：</p>
-<p>不直接优化 Σ，而是把它分解为<strong>缩放 s（3 维向量，椭球三个轴的长度）</strong>和<strong>旋转 q（四元数，椭球朝向）</strong>，<br>优化 s 和 q，再构造 Σ &#x3D; R S Sᵀ Rᵀ（R 由 q 得到，S &#x3D; diag(s)）。</p>
-<p>这样构造出的 Σ 一定是合法的半正定矩阵。</p>
-<h3 id="渲染时如何使用：alpha-blending"><a href="#渲染时如何使用：alpha-blending" class="headerlink" title="渲染时如何使用：alpha-blending"></a>渲染时如何使用：alpha-blending</h3><p>高斯先投影到屏幕，得到屏幕空间的 2D 高斯。<br>对每个像素，将重叠的 N 个高斯按深度从前往后混合：</p>
-<center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/alphablending%E5%85%AC%E5%BC%8F.png" style="height:50px" /></center>
-
-<p>（与 NeRF 成像模型相同，只是 αᵢ 的来源不同。）</p>
-<ul>
-<li>cᵢ：颜色，由 SH 按当前视角算出，换视角会变。</li>
-<li>αᵢ &#x3D; oᵢ · Gᵢ²ᴰ(x)：2D 高斯在像素处的值乘以可学习不透明度。<ul>
-<li>oᵢ：可学习不透明度，整个高斯上都一样，不随视角变（符号为自拟，论文未单独命名）。</li>
-<li>Gᵢ²ᴰ(x)：3D 高斯投影后在像素 x 处的值，中心最大（&#x3D;1），向边缘指数衰减，随像素位置和视角变化。</li>
-</ul>
-</li>
-<li>G 调制的是不透明度（混合权重），不是颜色：中心不是”颜色最深”，而是”贡献最大”。</li>
-</ul>
-<h2 id="3dgs自适应密度控制优化（优化高斯）"><a href="#3dgs自适应密度控制优化（优化高斯）" class="headerlink" title="3dgs自适应密度控制优化（优化高斯）"></a>3dgs自适应密度控制优化（优化高斯）</h2><p>不同位置3dgs密度不同 需要除点云初始化外的密度控制优化</p>
-<p><strong>需优化：μ，Σ，α，SH；密度（前后二者相关联）</strong></p>
-<ul>
-<li><h3 id="优化"><a href="#优化" class="headerlink" title="优化"></a>优化</h3><p>  用<strong>SGD</strong>（随机梯度下降）优化，支持定制的cuda kernel</p>
-<p>  用<strong>sigmoid激活函数</strong>优化α，<strong>指数激活函数</strong>优化Σ的scale，以限制数据范围</p>
-<p>  初始化Σ（正实数*identity matrix）使得高斯为<strong>各向同性高斯</strong>，即分布密度值仅与到均值距离有关、与方向无关</p>
-<p>  以距离最近的三个点（SfM生成的点云）为标准生成初始化高斯</p>
-<p>  用<strong>标准指数衰减调度</strong>优化μ</p>
-<p>  生成图片对比目标图片的<strong>loss</strong>由<strong>D-SSIM</strong>（衡量两幅图片相似性的算法）得到：<br>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E6%88%AA%E5%B1%8F2024-09-21%2017.30.39.png" alt="公式2.png"></p>
-  <!-- $$
-  \mathcal{L} = (1 - \lambda)\mathcal{L}_1 + \lambda\mathcal{L}_{D-SSIM}
-  $$ -->
-<p>  PS：实验中λ取0.2。这是训练用的 loss。评估时用的是 PSNR &#x2F; SSIM &#x2F; LPIPS，见「结果评估」。</p>
-</li>
-<li><h3 id="自适应高斯控制"><a href="#自适应高斯控制" class="headerlink" title="自适应高斯控制"></a>自适应高斯控制</h3><p>  用稀疏点云初始化出的高斯很稀疏，需控制单位体积中的高斯数量</p>
-<p>  预优化后，每100次迭代densify一次，并<strong>删除所有α值小于一个极小阈值的高斯</strong></p>
-<p>  关注<strong>高斯覆盖率极低（under-reconstruction）和单个高斯极大（over-reconstruction）</strong>的位置，因还原度低，此类位置<strong>视图-空间位置梯度</strong>很大</p>
-<p>  因此设置<strong>视图-空间位置梯度阈值</strong>（实验中取0.0002），超过阈值则需densify，优化过程如下图：</p>
-  <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E8%87%B4%E5%AF%86%E5%8C%96%E6%96%B9%E6%B3%95.png" style="height:200px" /></center>
-  
-<p>  如图，对于欠重构处，<strong>克隆</strong>一个高斯并向位置梯度方向移动。</p>
-<p>  对于过重构处，<strong>分裂</strong>该高斯。新高斯的scale因子由实验得到（实验中取1.6），位置由原高斯作为采样PDF来确定。</p>
-<p>  在视图中占比过大的高斯可能由于距相机过近或本身过大，会定期被清除，以保证画面质量、控制高斯总数。</p>
-</li>
-</ul>
-<h2 id="高斯的快速可微光栅化器（fast-3D→2D）"><a href="#高斯的快速可微光栅化器（fast-3D→2D）" class="headerlink" title="高斯的快速可微光栅化器（fast 3D→2D）"></a>高斯的快速可微光栅化器（fast 3D→2D）</h2><p>提速对象：投影渲染+高斯的快排（排相对视点的前后顺序，为了α混合）</p>
-<h3 id="该光栅化器特点："><a href="#该光栅化器特点：" class="headerlink" title="该光栅化器特点："></a>该光栅化器特点：</h3><ol>
-<li>为提速，先将所有高斯排序（距视点距离的顺序），再进行视角渲染；而非针对视角渲染的每个像素进行高斯排序</li>
-<li>支持高效反向传播算法</li>
-<li>内存占用小，每个像素固定占用一部分</li>
-<li><strong>光栅化管线可微</strong>，可投影各向异性高斯</li>
-</ol>
-<h3 id="渲染管线："><a href="#渲染管线：" class="headerlink" title="渲染管线："></a>渲染管线：</h3><ol>
-<li><p>将屏幕<strong>分成多个16*16像素的瓦片（tiles）</strong></p>
-</li>
-<li><p>进行<strong>视锥体剔除（frustum culling）</strong>，以确定在视图范围内的高斯（只保留与视锥体相交99%置信区间的高斯）</p>
- <center><img class="inline-img" src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E8%A7%86%E9%94%A5%E4%BD%93.png" style="height:170px" /></center>
- </li>
-<li><p>再用一个<strong>防护带（guard band）</strong>去除位置过偏的高斯（eg. 过于靠后或过于靠近前剪裁面）</p>
-</li>
-<li><p>根据覆盖的瓦片数<strong>将每个高斯实例化</strong>，并给每个实例分配一个<strong>key</strong>，包含其<strong>在视图空间中的深度信息</strong>和<strong>覆盖的瓦片编号信息</strong></p>
-</li>
-<li><p>基于key，使用<strong>GPU上的高效基数排序（fast GPU Radix sort）</strong>对高斯进行排序；后续渲染都基于这个顺序（可能会有瑕疵，但微不足道，速度更重要）</p>
-</li>
-<li><p>根据顺序（通过识别相对当下视点的最近高斯与最远高斯）<strong>为每个瓦片生成高斯序列</strong>，并为<strong>每个瓦片启动一个线程块</strong> —— 即每一瓦片共享一序列，因此瓦片大小选择为重要指标</p>
-</li>
-<li><p>每一线程块将该瓦片对应的高斯序列加载进该块的<strong>共享存储器</strong>；对于块中每个像素，<strong>从前往后遍历共享序列进行α-blending</strong>（最大化并行增益），<strong>累积至该像素的α达目标饱和度（唯一停止标准），停止遍历</strong></p>
-</li>
-<li><p>以一定频率检查线程块中每个线程情况，当16*16个像素都饱和，该线程块收束</p>
-</li>
-<li><p>渲染出图像后计算loss、反向传播、优化参数……</p>
-<p> 特别地：</p>
-<ul>
-<li>此方法不限制接收梯度更新的基本体数量，因此可灵活处理各类场景，无需特别调整</li>
-<li>反向传播时，为减少动态内存开销，从后至前再次遍历所在瓦片对应高斯序列</li>
-<li>α代表该高斯对像素颜色的影响程度，因此可以决定该高斯从loss得到多少梯度指令</li>
-</ul>
-</li>
-</ol>
-<h1 id="结果和总结"><a href="#结果和总结" class="headerlink" title="结果和总结"></a>结果和总结</h1><h2 id="结果评估"><a href="#结果评估" class="headerlink" title="结果评估"></a>结果评估</h2><p>pros：训练速度快，效果好</p>
-<p>cons：内存占用大（高斯太多（eg. 200k~500k），每个高斯的参数也多）</p>
-<p>尤其对比Nerf</p>
-<p><img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E7%BB%93%E6%9E%9C%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 10.22.37.png"></p>
-<p>论文用三个指标比较渲染结果和真实照片（评估用的测试视角<strong>不参与训练</strong>）：</p>
-<table>
-<thead>
-<tr>
-<th>指标</th>
-<th>衡量什么</th>
-<th>方向</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>PSNR</td>
-<td>逐像素的误差（基于均方误差）</td>
-<td>越高越好</td>
-</tr>
-<tr>
-<td>SSIM</td>
-<td>结构相似性（亮度、对比度、结构）</td>
-<td>越高越好</td>
-</tr>
-<tr>
-<td>LPIPS</td>
-<td>用预训练网络提取特征后的感知差异，更贴近人眼</td>
-<td><strong>越低</strong>越好</td>
-</tr>
-</tbody></table>
-<p><strong>注意：这三个指标和训练 loss 不是一回事。</strong> 训练 loss 是 L1 + D-SSIM（见上文），要对 θ 求梯度来更新参数；评估指标只用来<strong>打分</strong>，不参与训练。</p>
-<h2 id="消融实验（ablation-study）"><a href="#消融实验（ablation-study）" class="headerlink" title="消融实验（ablation study）"></a>消融实验（ablation study）</h2><p>即评估不同条件&#x2F;参数等因素对于结果的影响的实验</p>
-<ul>
-<li><h3 id="关于SfM"><a href="#关于SfM" class="headerlink" title="关于SfM"></a>关于SfM</h3><p>  实验对比了 <strong>用随机抽样初始化高斯 和 用SfM点云初始化高斯</strong> 得出的结果：</p>
-<p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/SfM%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 11.16.15.png"></p>
-<p>  渲染结果大体都不错，但前者会有画面细节问题，可能是由于有无法删除的漂浮物。</p>
-<p>  PS：SfM仅为一种估计方法，无法达到准确程度，后续研究若有更好方式，会提升效果。</p>
-</li>
-<li><h3 id="关于致密化（Densification）"><a href="#关于致密化（Densification）" class="headerlink" title="关于致密化（Densification）"></a><strong>关于致密化（Densification）</strong></h3><p>  实验对比了 <strong>通过克隆控制密度</strong>、<strong>通过分裂控制密度</strong> 和 <strong>通过克隆&amp;分裂控制密度</strong>（见2.3） 三种密度控制方式的结果：</p>
-<p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E8%87%B4%E5%AF%86%E5%8C%96%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 11.20.44.png"></p>
-<p>  只克隆可能会出现类似迷雾的画面表现，只分裂可能会丢失细节，结合起来效果最好。</p>
-</li>
-<li><h3 id="对接收梯度的高斯数限制（靠后的高斯是否要变）"><a href="#对接收梯度的高斯数限制（靠后的高斯是否要变）" class="headerlink" title="对接收梯度的高斯数限制（靠后的高斯是否要变）"></a>对接收梯度的高斯数限制（靠后的高斯是否要变）</h3><p>  因后面的高斯对像素影响小（即使其α值较高），且不考虑靠后高斯可以提速，实验对比了 <strong>限制每个像素只有靠前的10个高斯接收梯度（左）</strong> 和 <strong>前文所述方法（右）</strong> 所得结果：</p>
-<p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E5%89%8D10%E4%B8%AA%E9%AB%98%E6%96%AF%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 12.08.44.png"></p>
-<p>  限制靠后高斯的调整对最终效果是有影响的。这可能说明靠前高斯们的α值都不大，不足以覆盖靠后的高斯发挥作用。</p>
-</li>
-<li><h3 id="关于各向异性协方差"><a href="#关于各向异性协方差" class="headerlink" title="关于各向异性协方差"></a>关于各向异性协方差</h3><p>  实验对比了 <strong>使用各向异性协方差矩阵定义高斯</strong> 和 <strong>使用各向同性的一个r</strong>（减小内存占用）定义高斯 所得结果：</p>
-<p>  <img src="/../img/%E8%AE%BA%E6%96%87%E7%B2%BE%E8%AF%BB%E7%AC%94%E8%AE%B0%E7%B3%BB%E5%88%97%EF%BC%881%EF%BC%89/%E5%90%84%E5%90%91%E5%BC%82%E6%80%A7%E5%AF%B9%E6%AF%94.png" alt="截屏2024-09-21 12.48.02.png"></p>
-<p>  对比表明使用各向异性协方差矩阵图像呈现效果确实更好。</p>
-</li>
-<li><h3 id="关于球谐函数"><a href="#关于球谐函数" class="headerlink" title="关于球谐函数"></a>关于球谐函数</h3><p>  球谐函数的引入提高不同视角渲染质量</p>
-</li>
-</ul>
-<h2 id="不足（技术不足与效果不足）"><a href="#不足（技术不足与效果不足）" class="headerlink" title="不足（技术不足与效果不足）"></a>不足（技术不足与效果不足）</h2><ol>
-<li>未充分观察到的区域中会有<strong>artifacts（瑕疵、错误）</strong>（可能由于SfM初始化）</li>
-<li>某些区域会生成错误的长条形或“斑点状”的高斯</li>
-<li>实时渲染中可能会出错，体积大的高斯突然霸屏等（可能由于防护带草率地拒绝了部分高斯）</li>
-<li>过于简单的可见性算法</li>
-<li>未使用针对loss的正则化（添加惩罚项以防止模型过拟合）</li>
-<li>内存占用大（待优化）</li>
-</ol>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>3dgs是第一个用辐射场实现实时渲染的方法。</p>
-<p>目前<strong>只有光栅化例程在优化的cuda kernel中实现</strong>，我们期望剩余的优化也可以移植到cuda中。</p>
-<p><strong>mesh（网格）</strong>在应用领域中占重要分量，因传统方法渲染更快，市场份额占比极大。因此将3dgs技术生成的高斯转为游戏制作等场景中需要的网格也是重要研究方向。</p>
-<p>此文中没有呈现的<strong>3D高斯分布可视化展示</strong>，对理解高斯的规律、优化算法，可能有很大帮助。</p>
-]]></content>
-      <categories>
-        <category>论文笔记</category>
-      </categories>
-      <tags>
-        <tag>paper</tag>
-        <tag>CG</tag>
-        <tag>neural-rendering</tag>
       </tags>
   </entry>
   <entry>
@@ -961,13 +966,13 @@ $$ -->
 <td align="right"><strong>+0.0585</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#x63;&#x63;&#x40;&#x30;&#46;&#x32;&#53;">&#65;&#x63;&#x63;&#x40;&#x30;&#46;&#x32;&#53;</a></td>
+<td><a href="mailto:&#65;&#99;&#99;&#64;&#48;&#x2e;&#50;&#x35;">&#65;&#99;&#99;&#64;&#48;&#x2e;&#50;&#x35;</a></td>
 <td align="right">0.2958</td>
 <td align="right"><strong>0.3662</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#x63;&#99;&#x40;&#48;&#x2e;&#53;">&#65;&#x63;&#99;&#x40;&#48;&#x2e;&#53;</a></td>
+<td><a href="mailto:&#x41;&#x63;&#99;&#64;&#x30;&#46;&#53;">&#x41;&#x63;&#99;&#64;&#x30;&#46;&#53;</a></td>
 <td align="right">0.1690</td>
 <td align="right"><strong>0.2394</strong></td>
 <td align="right"><strong>+0.0704</strong></td>
@@ -1031,13 +1036,13 @@ $$ -->
 <td align="right"><strong>0.3379</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#x41;&#x63;&#99;&#64;&#48;&#x2e;&#x32;&#53;">&#x41;&#x63;&#99;&#64;&#48;&#x2e;&#x32;&#53;</a></td>
+<td><a href="mailto:&#x41;&#99;&#x63;&#x40;&#48;&#x2e;&#x32;&#53;">&#x41;&#99;&#x63;&#x40;&#48;&#x2e;&#x32;&#53;</a></td>
 <td align="right">0.2958</td>
 <td align="right">0.3662</td>
 <td align="right"><strong>0.4648</strong></td>
 </tr>
 <tr>
-<td><a href="mailto:&#65;&#99;&#x63;&#x40;&#48;&#46;&#53;">&#65;&#99;&#x63;&#x40;&#48;&#46;&#53;</a></td>
+<td><a href="mailto:&#65;&#x63;&#99;&#64;&#x30;&#46;&#x35;">&#65;&#x63;&#99;&#64;&#x30;&#46;&#x35;</a></td>
 <td align="right">0.1690</td>
 <td align="right">0.2394</td>
 <td align="right"><strong>0.3803</strong></td>
@@ -1053,8 +1058,8 @@ $$ -->
 <th>train</th>
 <th>render</th>
 <th align="right">mIoU</th>
-<th align="right"><a href="mailto:&#x41;&#x63;&#x63;&#64;&#48;&#x2e;&#x32;&#53;">&#x41;&#x63;&#x63;&#64;&#48;&#x2e;&#x32;&#53;</a></th>
-<th align="right"><a href="mailto:&#x41;&#99;&#x63;&#64;&#48;&#46;&#53;">&#x41;&#99;&#x63;&#64;&#48;&#46;&#53;</a></th>
+<th align="right"><a href="mailto:&#x41;&#99;&#x63;&#x40;&#x30;&#46;&#x32;&#x35;">&#x41;&#99;&#x63;&#x40;&#x30;&#46;&#x32;&#x35;</a></th>
+<th align="right"><a href="mailto:&#x41;&#99;&#99;&#64;&#x30;&#46;&#x35;">&#x41;&#99;&#99;&#64;&#x30;&#46;&#x35;</a></th>
 </tr>
 </thead>
 <tbody><tr>
